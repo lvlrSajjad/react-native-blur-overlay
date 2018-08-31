@@ -6,11 +6,11 @@
 
 ## Getting started
 
-`$ npm install react-native-blur-overlay --save`
+`$ npm install sajjad-blur-overlay --save`
 
 ### Mostly automatic installation
 
-`$ react-native link react-native-blur-overlay`
+`$ react-native link sajjad-blur-overlay`
 
 ### Manual installation
 
