@@ -24,7 +24,7 @@ Currently Not Supported , Comming Soon
 2. Append the following lines to `android/settings.gradle`:
   	```
       include ':sajjad-blur-overlay'
-project(':sajjad-blur-overlay').projectDir = new File(rootProject.projectDir, '../node_modules/sajjad-blur-overlay/android')
+      project(':sajjad-blur-overlay').projectDir = new File(rootProject.projectDir, '../node_modules/sajjad-blur-overlay/android')
 
   	```
 3. Insert the following lines inside the dependencies block in `android/app/build.gradle`:
