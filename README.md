@@ -31,7 +31,7 @@
   	```
 3. Insert the following lines inside the dependencies block in `android/app/build.gradle`:
   	```
-      compile project(':react-native-blur-overlay')
+      compile project(':sajjad-blur-overlay')
   	```
 
 
