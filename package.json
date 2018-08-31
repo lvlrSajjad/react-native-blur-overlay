@@ -10,7 +10,11 @@
   "keywords": [
     "react-native"
   ],
-  "author": "Sajjad Asadi",
+  "author": { "name" : "Sajjad Asadi"
+, "email" : "lvlr.xaus@gmail.com"
+, "url" : ""
+},
+  "homepage": "https://github.com/lvlrSajjad/sajjad-blur-overlay",
   "license": "MIT",
   "peerDependencies": {
     "react-native": "^0.41.2",
