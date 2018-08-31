@@ -66,7 +66,8 @@ constructor(props) {
   
   
   ## Props
+  ```
   radius : Int (Between  0 to 24)
   brightness : float (Between -255 to 255 , 0 = nochange)
   onPress : func
-
+```
