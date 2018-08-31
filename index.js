@@ -18,7 +18,7 @@ export default class BlurOverlay extends React.Component {
     render() {
         return (
             <TouchableWithoutFeedback style={styles.style} onPress={this.props.onPress}>
-                <RCTSajjadBlurOverlay {...this.props} style={styles.style}/>
+                <RCTSajjadBlurOverlay {...this.props} style={[this.props.customStyles,styles.style]}/>
             </TouchableWithoutFeedback>
         );
     }
