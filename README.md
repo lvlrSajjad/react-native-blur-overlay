@@ -55,6 +55,7 @@ constructor(props) {
                         onPress={()=>{
                             this.setState({showBlurOverlay: !this.state.showBlurOverlay});
                         }}
+                        customStyles={{alignItems:'center',justifyContent:'center'}}
                     >
                         <View style={styles.image}>
                         <Text style={styles.instructions2}>{instructions}</Text>
