@@ -1,5 +1,8 @@
 
 # react-native-blur-overlay
+![](giphy.gif)
+
+
 
 ## Getting started
 
