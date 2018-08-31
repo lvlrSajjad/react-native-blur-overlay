@@ -1,5 +1,5 @@
 
-# react-native-blur-overlay
+# sajjad-blur-overlay
 ![](giphy.gif)
 
 
