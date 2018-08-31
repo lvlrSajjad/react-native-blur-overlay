@@ -11,7 +11,7 @@
     "react-native"
   ],
   "author": "Sajjad Asadi",
-  "license": "",
+  "license": "MIT",
   "peerDependencies": {
     "react-native": "^0.41.2",
     "react-native-windows": "0.41.0-rc.1"
