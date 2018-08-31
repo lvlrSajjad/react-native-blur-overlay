@@ -36,6 +36,7 @@ const styles = StyleSheet.create({
         //  resizeMode: 'cover',
         width: null,
         height: null,
+        zIndex: 999,
     },
 });
 
