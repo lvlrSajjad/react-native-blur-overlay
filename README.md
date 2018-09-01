@@ -38,33 +38,86 @@ Currently Not Supported , Comming Soon
 
 ## Usage
 ```javascript
+import React, {Component} from 'react';
+import {Platform, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
 import BlurOverlay from 'sajjad-blur-overlay';
 
-constructor(props) {
+const instructions = Platform.select({
+    ios: 'Press Cmd+R to reload,\n' + 'Cmd+D or shake for dev menu',
+    android:
+    'Double tap R on your keyboard to reload,\n' +
+    'Shake or press menu button for dev menu',
+});
+
+type Props = {};
+export default class App extends Component<Props> {
+    constructor(props) {
         super(props);
         this.state = {
             showBlurOverlay: false,
         }
     }
-    
-    {this.state.showBlurOverlay &&
 
-                    <BlurOverlay
-                        radius={24}
-                        brightness={-200}
-                        onPress={()=>{
-                            this.setState({showBlurOverlay: !this.state.showBlurOverlay});
-                        }}
-                        customStyles={{alignItems:'center',justifyContent:'center'}}
-                    >
-                        <View style={styles.image}>
+    render() {
+        return (
+            <View style={styles.container}>
+                <TouchableOpacity
+                    onPress={() => {
+                        this.setState({showBlurOverlay: true});
+                    }}
+                    style={{width: '90%', height: 36, backgroundColor: "#03A9F4", borderRadius: 4, margin: 16}}/>
+                <Text style={styles.welcome}>Welcome to React Native!</Text>
+                <Text style={styles.instructions}>To get started, edit App.js</Text>
+                <Text style={styles.instructions}>{instructions}</Text>
+                {this.state.showBlurOverlay &&
+
+                <BlurOverlay
+                    radius={24}
+                    brightness={-200}
+                    onPress={() => {
+                        this.setState({showBlurOverlay: !this.state.showBlurOverlay});
+                    }}
+                    customStyles={{alignItems: 'center', justifyContent: 'center'}}
+
+                >
+                    <View style={styles.image}>
                         <Text style={styles.instructions2}>{instructions}</Text>
 
-                            <Text style={styles.instructions2}>{instructions}</Text>
-                        </View>
-                    </BlurOverlay>
+                        <Text style={styles.instructions2}>{instructions}</Text>
+                    </View>
+                </BlurOverlay>
 
                 }
+            </View>
+        );
+    }
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F5FCFF',
+    },
+    welcome: {
+        fontSize: 20,
+        textAlign: 'center',
+        margin: 10,
+    },
+    instructions2: {
+        alignSelf: 'center',
+        textAlign: 'center',
+        color: 'white',
+        marginBottom: 5,
+    },
+    instructions: {
+        textAlign: 'center',
+        color: '#333333',
+        marginBottom: 5,
+    },
+});
+
 ```
   
   
