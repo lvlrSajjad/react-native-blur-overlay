@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merger version="3"><dataSet config="main"><source path="D:\CodingProjects\ReactNative\BackgroundLocationTracker\TestBoilerPlate\node_modules\sajjad-blur-overlay\android\src\main\jniLibs"/></dataSet><dataSet config="debug"><source path="D:\CodingProjects\ReactNative\BackgroundLocationTracker\TestBoilerPlate\node_modules\sajjad-blur-overlay\android\src\debug\jniLibs"/></dataSet></merger>

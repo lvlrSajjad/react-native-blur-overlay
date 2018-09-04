@@ -1,31 +1,97 @@
-
 {
-  "name": "sajjad-blur-overlay",
-  "version": "1.0.3",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "_args": [
+    [
+      {
+        "raw": "sajjad-blur-overlay",
+        "scope": null,
+        "escapedName": "sajjad-blur-overlay",
+        "name": "sajjad-blur-overlay",
+        "rawSpec": "",
+        "spec": "latest",
+        "type": "tag"
+      },
+      "D:\\CodingProjects\\ReactNative\\BackgroundLocationTracker\\TestBoilerPlate"
+    ]
+  ],
+  "_from": "sajjad-blur-overlay@latest",
+  "_hasShrinkwrap": false,
+  "_id": "sajjad-blur-overlay@1.0.3",
+  "_inCache": true,
+  "_location": "/sajjad-blur-overlay",
+  "_nodeVersion": "8.10.0",
+  "_npmOperationalInternal": {
+    "host": "s3://npm-registry-packages",
+    "tmp": "tmp/sajjad-blur-overlay_1.0.3_1535741512933_0.8637018479162468"
   },
+  "_npmUser": {
+    "name": "lvlrsajjad",
+    "email": "lvlr.xaus@gmail.com"
+  },
+  "_npmVersion": "4.2.0",
+  "_phantomChildren": {},
+  "_requested": {
+    "raw": "sajjad-blur-overlay",
+    "scope": null,
+    "escapedName": "sajjad-blur-overlay",
+    "name": "sajjad-blur-overlay",
+    "rawSpec": "",
+    "spec": "latest",
+    "type": "tag"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/sajjad-blur-overlay/-/sajjad-blur-overlay-1.0.3.tgz",
+  "_shasum": "4c801723b494387842fbf85df145dced721ecfc2",
+  "_shrinkwrap": null,
+  "_spec": "sajjad-blur-overlay",
+  "_where": "D:\\CodingProjects\\ReactNative\\BackgroundLocationTracker\\TestBoilerPlate",
+  "author": {
+    "name": "Sajjad Asadi",
+    "email": "lvlr.xaus@gmail.com"
+  },
+  "dependencies": {},
+  "description": "![](giphy.gif)",
+  "devDependencies": {},
+  "directories": {},
+  "dist": {
+    "shasum": "4c801723b494387842fbf85df145dced721ecfc2",
+    "tarball": "https://registry.npmjs.org/sajjad-blur-overlay/-/sajjad-blur-overlay-1.0.3.tgz",
+    "integrity": "sha512-ZY0InCUlWpakxjOJMbl1XNb6QsE8l5bsT7b/I3RuCUJHVtBx1qDBtUSR+TmH8Mu2/Lu7fuoxK+yJBpgFLGBuQQ==",
+    "fileCount": 16,
+    "unpackedSize": 82847,
+    "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJbiY5JCRA9TVsSAnZWagAAfn0P/2KUE2MyRPW+HMT36jHV\n9420x3PXS8ST7dm09fWiYL1v6i7UIK3hDYwEcGeMxL5JfjM4Pz1nV3gS5A1H\nSTGfEyc0VO3Zz/reIL7RSX03NRfEoX7Zwy708lrai5HS6rZbQZVNE/Kx/XED\nrOXUrkLKHa/A9HWkHY+jLgll5YYLO4SC9Rp6/pydrybbm4Rx/SJLbY8Cjfme\n5lyKK+rVf4d7UlGC2waL5ey70QPAwmwYigse6rtRw3yrqC2LPcmbNXu4dGeR\n0vo1RNPFXPh9LpbOIj1WIIkJ8gANB4OQYCYirRIIGQ3kdJjWQO+fyl9coQna\nZhgr4E1CBiL0OwMbausK0QoN6ppzfPY53IbZW1V/Dy4JedHPYQFpQK5zXTu+\nMovlnAj7KjPAyiTK5FoT+yX7KjtCblJ/9GpeqIp0JP9MsBS4NYeh3+ADxYfr\nFCTj+JR6Rt7dPLggOyYDRtfEJQIG+wwtG6mhspR5Zf3G10XCATWE3WDwHXxb\nyU7pIYX/d6cbYq/tzLxlv03TQieWDlfckjTZb4TiRjVCkU2o/CknWtahUst1\ndT7wJYseSNWnTqGv1+39K9JyAaFFnrWOSmsrJ4+oWhZx8+S/3K58hklbAdkG\naBqKrhuDhmS5BnXw7myH4vYeiHdkcvpZShgf9MqDuUsorD4fFRaurc4FKuG4\nD3Y8\r\n=pU1x\r\n-----END PGP SIGNATURE-----\r\n"
+  },
+  "gitHead": "210aaaac5bc69e4ecf42a6b0d0edec2948a8c2ed",
+  "homepage": "https://github.com/lvlrSajjad/sajjad-blur-overlay",
   "keywords": [
     "react-native",
-	"sajjad-blur-overlay",
-	"blur",
-	"blur-view",
-	"react-native-blur",
-	"background",
-	"blur-background",
-	"view"
+    "sajjad-blur-overlay",
+    "blur",
+    "blur-view",
+    "react-native-blur",
+    "background",
+    "blur-background",
+    "view"
   ],
-  "author": { "name" : "Sajjad Asadi"
-, "email" : "lvlr.xaus@gmail.com"
-, "url" : ""
-},
-  "homepage": "https://github.com/lvlrSajjad/sajjad-blur-overlay",
   "license": "MIT",
+  "main": "index.js",
+  "maintainers": [
+    {
+      "name": "lvlrsajjad",
+      "email": "lvlr.xaus@gmail.com"
+    }
+  ],
+  "name": "sajjad-blur-overlay",
+  "optionalDependencies": {},
   "peerDependencies": {
     "react-native": "^0.41.2",
     "react-native-windows": "0.41.0-rc.1"
-
-  }
+  },
+  "readme": "ERROR: No README data found!",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "version": "1.0.3"
 }
