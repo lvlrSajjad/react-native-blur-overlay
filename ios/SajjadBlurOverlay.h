@@ -1,11 +1,9 @@
+#import <UIKit/UIKit.h>
+#import <React/RCTView.h>
 
-#if __has_include("RCTBridgeModule.h")
-#import "RCTBridgeModule.h"
-#else
-#import <React/RCTBridgeModule.h>
-#endif
+@interface SajjadBlurOverlay : RCTView
 
-@interface SajjadBlurOverlay : NSObject <RCTBridgeModule>
+@property (nonatomic, strong) NSString *blurStyle;
+@property (nonatomic) BOOL vibrant;
 
 @end
-  

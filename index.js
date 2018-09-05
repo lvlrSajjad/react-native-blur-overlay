@@ -1,12 +1,14 @@
-import {NativeModules, requireNativeComponent, StyleSheet, TouchableWithoutFeedback} from 'react-native';
+import {View, Platform, NativeModules, requireNativeComponent, StyleSheet, TouchableWithoutFeedback} from 'react-native';
 import React, {Component} from 'react';
 
 const {SajjadBlurOverlay} = NativeModules;
 var iface = {
     name: 'BlurView',
 };
-var RCTSajjadBlurOverlay = requireNativeComponent('RCTSajjadBlurOverlay', iface);
-
+var RCTSajjadBlurOverlay = Platform.select({
+  ios: () => requireNativeComponent('SajjadBlurOverlay', iface),
+  android: () => requireNativeComponent('RCTSajjadBlurOverlay', iface),
+})();
 export default class BlurOverlay extends React.Component {
     constructor(props) {
         super(props);
@@ -15,10 +17,19 @@ export default class BlurOverlay extends React.Component {
         }
     }
 
-    render() {
+
+        render() {
+
+          const { children } = this.props;
+
         return (
             <TouchableWithoutFeedback style={styles.style} onPress={this.props.onPress}>
-                <RCTSajjadBlurOverlay {...this.props} style={[this.props.customStyles,styles.style]}/>
+                <RCTSajjadBlurOverlay {...this.props} style={[this.props.customStyles,styles.style]}>
+                <View style={[this.props.customStyles,styles.style]}>
+                {children}
+
+                </View>
+                </RCTSajjadBlurOverlay>
             </TouchableWithoutFeedback>
         );
     }
