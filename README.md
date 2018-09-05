@@ -44,7 +44,6 @@
 ```javascript
 import React, {Component} from 'react';
 import {Platform, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
-import BackgroundLocationTracking from 'sajjad-background-location-tracker';
 import BlurOverlay from 'sajjad-blur-overlay';
 
 const instructions = Platform.select({
@@ -77,25 +76,6 @@ export default class App extends Component<Props> {
         return (
 
             <View style={styles.container}>
-
-                <TouchableOpacity
-                    onPress={() => {
-                        BackgroundLocationTracking.StartLocationService(
-                            "AuthKey",
-                            "http://www.ControllerLink.com/controller",
-                            "Notification Title",
-                            "Notification Subtitle",
-                            "Latitude Json Param Name",
-                            "Longitude Json Param Name",
-                            "AuthKey Json Param Name"
-                            );
-                    }}
-                    style={{width: '90%', height: 36, backgroundColor: "#03A9F4", borderRadius: 4, margin: 16}}/>
-                <TouchableOpacity
-                    onPress={() => {
-                        BackgroundLocationTracking.StopLocationService();
-                    }}
-                    style={{width: '90%', height: 36, backgroundColor: "#03A9F4", borderRadius: 4, margin: 16}}/>
                 <TouchableOpacity
                     onPress={() => {
                         this.setState({showBlurOverlay:true})
