@@ -1,6 +1,5 @@
 
 # sajjad-blur-overlay
-![](giphy.gif)
 <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/giphy.gif" width="300"><img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled.jpg" width="300"><img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled2.jpg" width="300">
 
 
