@@ -20,7 +20,7 @@
 
 1. In XCode right click on project's name and choose Add Files to..
 2. Go to node_modules/sajjad-blur-overlay and select ios folder
-   Now you're ready to require('react-native-effects-view') inside your app!
+   Now you're ready to require('sajjad-blur-overlay') inside your app!
 
 
 #### Android
