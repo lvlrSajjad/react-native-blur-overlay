@@ -1,10 +1,7 @@
 
 # sajjad-blur-overlay
 ![](giphy.gif)
-<img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled.jpg" width="200">
-
-
-<img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled2.jpg" width="200">
+<img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled.jpg" width="200"><img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled2.jpg" width="200">
 
 
 ## Getting started
