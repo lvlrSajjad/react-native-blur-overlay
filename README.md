@@ -1,9 +1,8 @@
 
 # sajjad-blur-overlay
 ![](giphy.gif)
-![](Untitled.gif)
-![](Untitled2.gif)
-
+![](Untitled.jpg)
+![](Untitled2.jpg)
 
 
 ## Getting started
