@@ -48,6 +48,7 @@
     "react-native": "^0.41.2",
     "react-native-windows": "0.41.0-rc.1"
   },
+  "homepage": "https://github.com/lvlrSajjad/sajjad-blur-overlay",
   "readme": "ERROR: No README data found!",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
