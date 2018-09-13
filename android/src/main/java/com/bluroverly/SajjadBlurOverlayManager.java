@@ -67,10 +67,10 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
                 int statusBarHeight = frame.top;
                 int width = activity.getWindowManager().getDefaultDisplay().getWidth();
                 int height = activity.getWindowManager().getDefaultDisplay().getHeight();
-                Bitmap b = Bitmap.createBitmap(b1, 0, statusBarHeight, width, height - statusBarHeight);
+                b1 = Bitmap.createBitmap(b1, 0, statusBarHeight, width, height - statusBarHeight);
                 view.destroyDrawingCache();
-                b =changeBitmapContrastBrightness(blur(reactContext,b,mRadius),1,mBrightness);
-                return new BitmapDrawable(reactContext.getResources(),b);
+                b1 =blur(reactContext,b1,mRadius,1,mBrightness);
+                return new BitmapDrawable(reactContext.getResources(),b1);
             } else {
                 return null;
             }
@@ -79,7 +79,16 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
         }
     }
 
-    public static Bitmap blur(Context context, Bitmap image, int Radius) {
+    /**
+     *
+     * @param context
+     * @param image screenshot bitmap
+     * @param Radius integer between 1 to 24
+     * @param contrast 0..10 1 is default
+     * @param brightness -255..255 0 is default
+     * @return blurred Bitmap
+     */
+    public static Bitmap blur(Context context, Bitmap image, int Radius, float contrast, float brightness) {
         Bitmap outputBitmap = Bitmap.createBitmap(image);
         rs = RenderScript.create(context);
         ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
@@ -90,18 +99,7 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
         theIntrinsic.forEach(tmpOut);
         tmpOut.copyTo(outputBitmap);
         rs.destroy();
-        return outputBitmap;
-    }
 
-    /**
-     *
-     * @param bmp input bitmap
-     * @param contrast 0..10 1 is default
-     * @param brightness -255..255 0 is default
-     * @return new bitmap
-     */
-    public static Bitmap changeBitmapContrastBrightness(Bitmap bmp, float contrast, float brightness)
-    {
         ColorMatrix cm = new ColorMatrix(new float[]
                 {
                         contrast, 0, 0, 0, brightness,
@@ -110,30 +108,29 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
                         0, 0, 0, 1, 0
                 });
 
-        Bitmap ret = Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
 
-        Canvas canvas = new Canvas(ret);
+        Canvas canvas = new Canvas(outputBitmap);
 
         Paint paint = new Paint();
         paint.setColorFilter(new ColorMatrixColorFilter(cm));
-        canvas.drawBitmap(bmp, 0, 0, paint);
+        canvas.drawBitmap(outputBitmap, 0, 0, paint);
 
-        return ret;
+        return outputBitmap;
     }
 
 
     @ReactProp(name = "radius")
     public void setRadius(ReactViewGroup view, int Radius) {
-            mRadius = Radius;
-        view.setBackgroundDrawable(screenShot());
-        view.requestFocus();
+        mRadius = Radius;
+      //  view.setBackgroundDrawable(screenShot());
+      //  view.requestFocus();
     }
 
     @ReactProp(name = "brightness")
     public void setBrightness(ReactViewGroup view, float brightness) {
         mBrightness = brightness;
 
-        view.setBackgroundDrawable(screenShot());
-        view.requestFocus();
+       // view.setBackgroundDrawable(screenShot());
+       // view.requestFocus();
     }
 }
