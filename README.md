@@ -1,6 +1,4 @@
 
-[![https://nodei.co/npm/sajjad-blur-overlay.png?downloads=true&downloadRank=true&stars=true](https://nodei.co/npm/sajjad-blur-overlay.png?downloads=true&downloadRank=true&stars=true)](https://www.npmjs.com/package/sajjad-blur-overlay)
-
 # sajjad-blur-overlay [![npm version](https://img.shields.io/npm/v/sajjad-blur-overlay.svg)](https://www.npmjs.com/package/sajjad-blur-overlay)
 
 <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/giphy.gif" width="250">   <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled.jpg" width="250">  <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled2.jpg" width="250">
