@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/lvlrsajjad/sajjad-blur-overlay.png?branch=master)](https://travis-ci.org/lvlrsajjad/sajjad-blur-overlay)
+
 [![HitCount](http://hits.dwyl.com/lvlrsajjad/sajjad-blur-overlay.svg)](http://hits.dwyl.com/lvlrsajjad/sajjad-blur-overlay)
 
 # sajjad-blur-overlay
