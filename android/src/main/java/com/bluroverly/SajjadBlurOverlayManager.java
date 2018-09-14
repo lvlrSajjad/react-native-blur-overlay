@@ -49,7 +49,7 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
     protected ReactViewGroup createViewInstance(ThemedReactContext reactContext) {
         mContext = reactContext;
         ReactViewGroup iv = new ReactViewGroup(reactContext);
-        iv.setBackgroundDrawable(screenShot());
+      //  iv.setBackgroundDrawable(screenShot());
         return iv;
     }
 
@@ -130,7 +130,7 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
     public void setBrightness(ReactViewGroup view, float brightness) {
         mBrightness = brightness;
 
-       // view.setBackgroundDrawable(screenShot());
-       // view.requestFocus();
+        view.setBackgroundDrawable(screenShot());
+        view.requestFocus();
     }
 }
