@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/lvlrsajjad/sajjad-blur-overlay.png?branch=master)](https://travis-ci.org/lvlrsajjad/sajjad-blur-overlay)
+
 [![Node version](https://img.shields.io/node/v/sajjad-blur-overlay.svg?style=flat)](http://nodejs.org/sajjad-blur-overlay/)
 
 # sajjad-blur-overlay
