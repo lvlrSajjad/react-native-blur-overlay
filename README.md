@@ -1,7 +1,5 @@
 [![Build Status](https://travis-ci.org/lvlrsajjad/sajjad-blur-overlay.png?branch=master)](https://travis-ci.org/lvlrsajjad/sajjad-blur-overlay)
 
-[![HitCount](http://hits.dwyl.com/lvlrsajjad/sajjad-blur-overlay.svg)](http://hits.dwyl.com/lvlrsajjad/sajjad-blur-overlay)
-
 # sajjad-blur-overlay
 <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/giphy.gif" width="250">   <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled.jpg" width="250">  <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled2.jpg" width="250">
 
