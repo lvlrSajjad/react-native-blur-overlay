@@ -2,10 +2,10 @@
   "_args": [
     [
       {
-        "raw": "sajjad-blur-overlay",
+        "raw": "react-native-blur-overlay",
         "scope": null,
-        "escapedName": "sajjad-blur-overlay",
-        "name": "sajjad-blur-overlay",
+        "escapedName": "react-native-blur-overlay",
+        "name": "react-native-blur-overlay",
         "rawSpec": "",
         "spec": "latest",
         "type": "tag"
@@ -18,7 +18,7 @@
     "email": "lvlr.xaus@gmail.com"
   },
 
-  "_spec": "sajjad-blur-overlay",
+  "_spec": "react-native-blur-overlay",
   "_where": "D:\\CodingProjects\\ReactNative\\BackgroundLocationTracker\\TestBoilerPlate",
   "author": {
     "name": "Sajjad Asadi",
@@ -26,13 +26,19 @@
   },
   "keywords": [
     "react-native",
-    "sajjad-blur-overlay",
+    "react-native-blur-overlay",
     "blur",
     "blur-view",
     "react-native-blur",
+	"react-native-blur-background",
     "background",
     "blur-background",
-    "view"
+    "view",
+	"react native blur",
+	"react native blur overlay",
+	"react native overlay",
+	"react-native-overlay",
+	"overlay"
   ],
   "license": "MIT",
   "main": "index.js",
@@ -42,16 +48,16 @@
       "email": "lvlr.xaus@gmail.com"
     }
   ],
-  "name": "sajjad-blur-overlay",
+  "name": "react-native-blur-overlay",
   "optionalDependencies": {},
   "peerDependencies": {
     "react-native": "^0.41.2",
     "react-native-windows": "0.41.0-rc.1"
   },
-  "homepage": "https://github.com/lvlrSajjad/sajjad-blur-overlay",
+  "homepage": "https://github.com/lvlrSajjad/react-native-blur-overlay",
   "readme": "ERROR: No README data found!",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "1.0.7"
+  "version": "1.0.0"
 }

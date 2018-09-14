@@ -1,16 +1,16 @@
 
-# react-native-blur-overlay [![npm version](https://img.shields.io/npm/v/sajjad-blur-overlay.svg)](https://www.npmjs.com/package/sajjad-blur-overlay)
+# react-native-blur-overlay [![npm version](https://img.shields.io/npm/v/react-native-blur-overlay.svg)](https://www.npmjs.com/package/react-native-blur-overlay)
 
-<img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/giphy.gif" width="250">   <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled.jpg" width="250">  <img src="https://raw.githubusercontent.com/lvlrSajjad/sajjad-blur-overlay/master/Untitled2.jpg" width="250">
+<img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/giphy.gif" width="250">   <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/Untitled.jpg" width="250">  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/Untitled2.jpg" width="250">
 
 
 ## Getting started
 
-`$ npm install sajjad-blur-overlay --save`
+`$ npm install react-native-blur-overlay --save`
 
 ### Mostly automatic installation
 
-`$ react-native link sajjad-blur-overlay`
+`$ react-native link react-native-blur-overlay`
 
 ### Manual installation
 
@@ -18,8 +18,8 @@
 #### iOS
 
 1. In XCode right click on project's name and choose Add Files to..
-2. Go to node_modules/sajjad-blur-overlay and select ios folder
-   Now you're ready to require('sajjad-blur-overlay') inside your app!
+2. Go to node_modules/react-native-blur-overlay and select ios folder
+   Now you're ready to require('react-native-blur-overlay') inside your app!
 
 
 #### Android
@@ -29,13 +29,13 @@
   - Add `new SajjadBlurOverlayPackage()` to the list returned by the `getPackages()` method
 2. Append the following lines to `android/settings.gradle`:
   	```
-      include ':sajjad-blur-overlay'
-      project(':sajjad-blur-overlay').projectDir = new File(rootProject.projectDir, '../node_modules/sajjad-blur-overlay/android')
+      include ':react-native-blur-overlay'
+      project(':react-native-blur-overlay').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-blur-overlay/android')
 
   	```
 3. Insert the following lines inside the dependencies block in `android/app/build.gradle`:
   	```
-      compile project(':sajjad-blur-overlay')
+      compile project(':react-native-blur-overlay')
   	```
 
 
@@ -43,7 +43,7 @@
 ```javascript
 import React, {Component} from 'react';
 import {Platform, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
-import BlurOverlay from 'sajjad-blur-overlay';
+import BlurOverlay from 'react-native-blur-overlay';
 
 const instructions = Platform.select({
     ios: 'Press Cmd+R to reload,\n' + 'Cmd+D or shake for dev menu',
