@@ -84,6 +84,7 @@ export function closeOverlay() {
             {
                 toValue: 0,
                 duration: 500,
+                useNativeDriver: true
             }
         )
     ]).start(()=>this.setState({showBlurOverlay: false}));
