@@ -1,4 +1,4 @@
-import {View, Platform, NativeModules, requireNativeComponent, StyleSheet, TouchableWithoutFeedback} from 'react-native';
+import {View, Platform, NativeModules, requireNativeComponent, StyleSheet, TouchableWithoutFeedback,Animated} from 'react-native';
 import React, {Component} from 'react';
 
 const {SajjadBlurOverlay} = NativeModules;
@@ -13,8 +13,12 @@ export default class BlurOverlay extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            showBlurOverlay: false,
+          showBlurOverlay: false,
+          fadeIn: new Animated.Value(0),
         }
+        openOverlay = openOverlay.bind(this);
+        closeOverlay = closeOverlay.bind(this);
+
     }
 
 
@@ -23,6 +27,8 @@ export default class BlurOverlay extends React.Component {
           const { children } = this.props;
 
         return (
+            this.state.showBlurOverlay ?
+            <Animated.View style={[ {opacity: this.state.fadeIn},styles.style]}>
             <TouchableWithoutFeedback style={styles.style} onPress={this.props.onPress}>
                 <RCTSajjadBlurOverlay {...this.props} style={[this.props.customStyles,styles.style]}>
                 <View style={[this.props.customStyles,styles.style]}>
@@ -31,6 +37,8 @@ export default class BlurOverlay extends React.Component {
                 </View>
                 </RCTSajjadBlurOverlay>
             </TouchableWithoutFeedback>
+            </Animated.View> :
+                null
         );
     }
 }
@@ -50,6 +58,36 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
 });
+export function openOverlay() {
 
+    this.setState({
+        showBlurOverlay: true,
+        fadeIn: new Animated.Value(0),
+    }, () => {
+        Animated.parallel([
+            Animated.timing(
+                this.state.fadeIn,
+                {
+                    toValue: 1,
+                    duration: 500,
+                }
+            )
+        ]).start();
+    })
+
+}
+
+export function closeOverlay() {
+    Animated.parallel([
+        Animated.timing(
+            this.state.fadeIn,
+            {
+                toValue: 0,
+                duration: 500,
+            }
+        )
+    ]).start(()=>this.setState({showBlurOverlay: false}));
+
+}
 //export default SajjadBlurOverlay;
 //module.exports = requireNativeComponent('RCTSajjadBlurOverlay', iface);
