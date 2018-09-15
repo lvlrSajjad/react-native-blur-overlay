@@ -44,7 +44,7 @@
 ```javascript
 import React, {Component} from 'react';
 import {Platform, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
-import BlurOverlay from 'react-native-blur-overlay';
+import BlurOverlay,{closeOverlay,openOverlay} from 'react-native-blur-overlay';
 
 const instructions = Platform.select({
     ios: 'Press Cmd+R to reload,\n' + 'Cmd+D or shake for dev menu',
@@ -57,9 +57,6 @@ type Props = {};
 export default class App extends Component<Props> {
     constructor(props) {
         super(props);
-        this.state = {
-            showBlurOverlay: false,
-        }
     }
 
     renderBlurChilds() {
@@ -78,26 +75,26 @@ export default class App extends Component<Props> {
             <View style={styles.container}>
                 <TouchableOpacity
                     onPress={() => {
-                        this.setState({showBlurOverlay:true})
+                        openOverlay();
                     }}
                     style={{width: '90%', height: 36, backgroundColor: "#03A9F4", borderRadius: 4, margin: 16}}/>
 
                 <Text style={styles.welcome}>Welcome to React Native!</Text>
                 <Text style={styles.instructions}>To get started, edit App.js</Text>
                 <Text style={styles.instructions}>{instructions}</Text>
-                {this.state.showBlurOverlay &&
+                
 
                 <BlurOverlay
                     radius={14}
                     brightness={-200}
                     onPress={() => {
-                        this.setState({showBlurOverlay: !this.state.showBlurOverlay});
+                        closeOverlay();
                     }}
                     customStyles={{alignItems: 'center', justifyContent: 'center'}}
                     blurStyle="dark"
                     children={this.renderBlurChilds()}
                 />
-                }
+                
             </View>
         );
     }
