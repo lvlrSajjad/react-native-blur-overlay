@@ -11,6 +11,8 @@ var iface = {
         brightness: PropTypes.any,
         radius: PropTypes.number,
         downsampling: PropTypes.number,
+        blurStyle: PropTypes.string,
+        vibrant: PropTypes.bool,
     }
 };
 var RCTSajjadBlurOverlay = Platform.select({
