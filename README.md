@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   ```
   android only:
    radius : Int (Between  0 to 24)
-   downsampling : float (Greater than 1)
+   downsampling : float (>= 1)
    brightness : float (Between -255 to 255 , 0 = nochange)
   
   ios only : 
