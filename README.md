@@ -86,6 +86,7 @@ export default class App extends Component<Props> {
 
                 <BlurOverlay
                     radius={14}
+                    downsampling={2}
                     brightness={-200}
                     onPress={() => {
                         closeOverlay();
@@ -132,6 +133,7 @@ const styles = StyleSheet.create({
   ```
   android only:
    radius : Int (Between  0 to 24)
+   downsampling : float (Greater than 1)
    brightness : float (Between -255 to 255 , 0 = nochange)
   
   ios only : 
