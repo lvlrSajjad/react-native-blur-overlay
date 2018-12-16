@@ -25,7 +25,7 @@
 
 #### Android
 
-**Only works on Android >= 17 !!!**
+**Blur Only works on Android >= 17 !!! Brightness and should work everywhere though**
 
 1. Open up `android/app/src/main/java/[...]/MainApplication.java`
   - Add `import com.bluroverly.SajjadBlurOverlayPackage;` to the imports at the top of the file
