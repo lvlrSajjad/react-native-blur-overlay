@@ -25,6 +25,8 @@
 
 #### Android
 
+**Only works on Android >= 17 !!!**
+
 1. Open up `android/app/src/main/java/[...]/MainApplication.java`
   - Add `import com.bluroverly.SajjadBlurOverlayPackage;` to the imports at the top of the file
   - Add `new SajjadBlurOverlayPackage()` to the list returned by the `getPackages()` method

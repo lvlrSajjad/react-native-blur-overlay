@@ -54,7 +54,7 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
      */
     public static Bitmap blur(Context context, Bitmap image, int Radius, float contrast, float brightness, float factor) {
         Bitmap outputBitmap;
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+        if(Radius > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             outputBitmap = Bitmap.createBitmap(image);
             RenderScript rs = RenderScript.create(context);
             ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
