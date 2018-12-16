@@ -1,6 +1,5 @@
 package com.bluroverly;
 
-
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -21,7 +20,6 @@ import android.view.View;
 import com.facebook.react.bridge.ReactApplicationContext;
 
 import java.lang.ref.WeakReference;
-import java.util.concurrent.CountDownLatch;
 
 public class BlurTask extends AsyncTask<Void, Void, Drawable> {
     static private Drawable screenShot(
@@ -35,7 +33,7 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
         try {
             if(factor!=1)
                 b1 = Bitmap.createScaledBitmap(b1,(int)(width/factor),(int)(height/factor),false);
-            b1 = blur(reactContext,b1,radius,1,brightness,factor);
+            b1 = blur(reactContext,b1,radius, brightness,factor);
             return new BitmapDrawable(reactContext.getResources(),b1);
         } catch (Exception e) {
             e.printStackTrace();
@@ -45,14 +43,13 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
 
     /**
      *
-     * @param context
+     * @param context React Application Context
      * @param image screenshot bitmap
      * @param Radius integer between 1 to 24
-     * @param contrast 0..10 1 is default
      * @param brightness -255..255 0 is default
      * @return blurred Bitmap
      */
-    public static Bitmap blur(Context context, Bitmap image, int Radius, float contrast, float brightness, float factor) {
+    private static Bitmap blur(Context context, Bitmap image, int Radius, float brightness, float factor) {
         Bitmap outputBitmap;
         if(Radius > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             outputBitmap = Bitmap.createBitmap(image);
@@ -71,9 +68,9 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
         if(brightness!=0){
             ColorMatrix cm = new ColorMatrix(new float[]
                     {
-                            contrast, 0, 0, 0, brightness,
-                            0, contrast, 0, 0, brightness,
-                            0, 0, contrast, 0, brightness,
+                            (float) 1, 0, 0, 0, brightness,
+                            0, (float) 1, 0, 0, brightness,
+                            0, 0, (float) 1, 0, brightness,
                             0, 0, 0, 1, 0
                     });
             Canvas canvas = new Canvas(outputBitmap);
@@ -121,6 +118,7 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
     protected void onPostExecute(final Drawable result) {
         try{
             try {
+                //noinspection deprecation
                 view.get().setBackgroundDrawable(result);
             } catch (Exception e) {
                 e.printStackTrace();
