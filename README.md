@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   ## Props
   ```
   android only:
-   radius : Int (Between  0 to 24)
+   radius : Int (Between  0 to 25*downsampling)
    downsampling : float (>= 1)
    brightness : float (Between -255 to 255 , 0 = nochange)
   
