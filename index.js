@@ -40,6 +40,7 @@ export default class BlurOverlay extends React.Component {
                    {
                        toValue: 1,
                        duration: 500,
+                       useNativeDriver: true
                    }
                )
            ]).start();
