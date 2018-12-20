@@ -1,6 +1,7 @@
 package com.bluroverly;
 
 import android.app.Activity;
+import android.renderscript.RenderScript;
 import android.view.View;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.uimanager.ThemedReactContext;
@@ -14,9 +15,10 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
     private int mRadius = 20;
     private float mBrightness = 0;
     private float mFactor = 1;
-
+    private RenderScript rs;
     SajjadBlurOverlayManager(ReactApplicationContext reactContext) {
         this.reactContext = reactContext;
+        this.rs = RenderScript.create(reactContext);
     }
 
     @Override
@@ -43,7 +45,7 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
     private void setBlurred(final View view){
         final Activity activity = reactContext.getCurrentActivity();
         if(activity==null) return;
-        new BlurTask(view,reactContext,activity,mRadius,mFactor,mBrightness).execute();
+        new BlurTask(view,reactContext,rs,activity,mRadius,mFactor,mBrightness).execute();
     }
 
     @ReactProp(name = "brightness")

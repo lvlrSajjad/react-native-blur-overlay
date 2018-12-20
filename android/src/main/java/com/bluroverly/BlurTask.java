@@ -1,7 +1,6 @@
 package com.bluroverly;
 
 import android.app.Activity;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.ColorMatrix;
@@ -24,16 +23,13 @@ import java.lang.ref.WeakReference;
 public class BlurTask extends AsyncTask<Void, Void, Drawable> {
     static private Drawable screenShot(
             ReactApplicationContext reactContext,
+            RenderScript rs,
             Bitmap b1,
-            int width,
-            int height,
             int radius,
             float factor,
             float brightness) {
         try {
-            if(factor!=1)
-                b1 = Bitmap.createScaledBitmap(b1,(int)(width/factor),(int)(height/factor),false);
-            b1 = blur(reactContext,b1,radius, brightness,factor);
+            b1 = blur(rs,b1,radius, brightness,factor);
             return new BitmapDrawable(reactContext.getResources(),b1);
         } catch (Exception e) {
             e.printStackTrace();
@@ -43,17 +39,16 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
 
     /**
      *
-     * @param context React Application Context
+     * @param rs RenderScript Context
      * @param image screenshot bitmap
      * @param Radius integer between 1 to 24
      * @param brightness -255..255 0 is default
      * @return blurred Bitmap
      */
-    private static Bitmap blur(Context context, Bitmap image, int Radius, float brightness, float factor) {
+    private static Bitmap blur(RenderScript rs, Bitmap image, int Radius, float brightness, float factor) {
         Bitmap outputBitmap;
         if(Radius > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            outputBitmap = Bitmap.createBitmap(image);
-            RenderScript rs = RenderScript.create(context);
+            outputBitmap = Bitmap.createBitmap(image.getWidth(),image.getHeight(), Bitmap.Config.ARGB_8888);
             ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
             Allocation tmpIn = Allocation.createFromBitmap(rs, image);
             Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
@@ -61,7 +56,6 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
             theIntrinsic.setInput(tmpIn);
             theIntrinsic.forEach(tmpOut);
             tmpOut.copyTo(outputBitmap);
-            rs.destroy();
         } else {
             outputBitmap = image;
         }
@@ -83,28 +77,28 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
     private WeakReference<View> view;
     private WeakReference<Activity> activity;
     private WeakReference<ReactApplicationContext> ctx;
+    private WeakReference<RenderScript> rs;
     private float factor;
     private int radius;
     private float brightness;
     private Bitmap b1;
-    private int width,height;
     // only retain a weak reference to the activity
-    BlurTask(View view, ReactApplicationContext ctx, Activity activity, int radius, float factor, float brightness ) {
+    BlurTask(View view, ReactApplicationContext ctx, RenderScript rs, Activity activity, int radius, float factor, float brightness ) {
         this.view = new WeakReference<>(view);
         this.activity = new WeakReference<>(activity);
         this.ctx = new WeakReference<>(ctx);
         this.factor = factor;
         this.radius = radius;
         this.brightness = brightness;
+        this.rs = new WeakReference<>(rs);
     }
 
     protected void onPreExecute() {
         try {
             final View view = activity.get().getWindow().getDecorView().findViewById(android.R.id.content);
-            width = view.getWidth();
-            height = view.getHeight();
-            b1 = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
+            b1 = Bitmap.createBitmap((int)(view.getWidth()/factor), (int)(view.getHeight()/factor), Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(b1);
+            c.scale(1/factor,1/factor);
             view.draw(c);
         } catch (Exception e) {
             e.printStackTrace();
@@ -112,7 +106,7 @@ public class BlurTask extends AsyncTask<Void, Void, Drawable> {
     }
 
     protected Drawable doInBackground(Void... param) {
-        return screenShot(ctx.get(),b1, width,height,radius,factor,brightness);
+        return screenShot(ctx.get(),rs.get(),b1,radius,factor,brightness);
     }
 
     protected void onPostExecute(final Drawable result) {
