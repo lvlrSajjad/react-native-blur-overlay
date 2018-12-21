@@ -34,29 +34,25 @@ export default class BlurOverlay extends React.Component {
            showBlurOverlay: true,
            fadeIn: new Animated.Value(0),
        }, () => {
-           Animated.parallel([
-               Animated.timing(
-                   this.state.fadeIn,
-                   {
-                       toValue: 1,
-                       duration: 500,
-                       useNativeDriver: true
-                   }
-               )
-           ]).start();
-       })
-    }
-    closeOverlay(){
-        Animated.parallel([
             Animated.timing(
                 this.state.fadeIn,
                 {
-                    toValue: 0,
+                    toValue: 1,
                     duration: 500,
                     useNativeDriver: true
                 }
-            )
-        ]).start(()=>this.setState({showBlurOverlay: false}));
+            ).start();
+       })
+    }
+    closeOverlay(){
+        Animated.timing(
+            this.state.fadeIn,
+            {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true
+            }
+        ).start(()=>this.setState({showBlurOverlay: false}));
     }
     componentDidMount(){
         emitter.on('drawer-open',this._openOverlay);
