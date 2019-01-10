@@ -17,7 +17,6 @@
     "name": "lvlrsajjad",
     "email": "lvlr.xaus@gmail.com"
   },
-
   "_spec": "react-native-blur-overlay",
   "_where": "D:\\CodingProjects\\ReactNative\\BackgroundLocationTracker\\TestBoilerPlate",
   "author": {
@@ -30,15 +29,15 @@
     "blur",
     "blur-view",
     "react-native-blur",
-	"react-native-blur-background",
+    "react-native-blur-background",
     "background",
     "blur-background",
     "view",
-	"react native blur",
-	"react native blur overlay",
-	"react native overlay",
-	"react-native-overlay",
-	"overlay"
+    "react native blur",
+    "react native blur overlay",
+    "react native overlay",
+    "react-native-overlay",
+    "overlay"
   ],
   "license": "MIT",
   "main": "index.js",
@@ -59,5 +58,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "1.0.4"
+  "version": "1.0.4",
+  "dependencies": {
+    "tiny-emitter": "^2.0.2"
+  }
 }

@@ -25,6 +25,8 @@
 
 #### Android
 
+**Blur Only works on Android >= 17 !!! Brightness and should work everywhere though**
+
 1. Open up `android/app/src/main/java/[...]/MainApplication.java`
   - Add `import com.bluroverly.SajjadBlurOverlayPackage;` to the imports at the top of the file
   - Add `new SajjadBlurOverlayPackage()` to the list returned by the `getPackages()` method
@@ -86,6 +88,7 @@ export default class App extends Component<Props> {
 
                 <BlurOverlay
                     radius={14}
+                    downsampling={2}
                     brightness={-200}
                     onPress={() => {
                         closeOverlay();
@@ -131,7 +134,8 @@ const styles = StyleSheet.create({
   ## Props
   ```
   android only:
-   radius : Int (Between  0 to 24)
+   radius : Int (Between  0 to 25*downsampling)
+   downsampling : float (>= 1)
    brightness : float (Between -255 to 255 , 0 = nochange)
   
   ios only : 
