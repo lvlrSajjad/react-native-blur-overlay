@@ -68,7 +68,7 @@ export default class BlurOverlay extends React.Component {
         return (
             this.state.showBlurOverlay ?
             <Animated.View style={[ {opacity: this.state.fadeIn},styles.style]}>
-            <TouchableWithoutFeedback style={styles.style} onPress={this._closeOverlay}>
+            <TouchableWithoutFeedback style={styles.style} onPress={this.props.onPress}>
                 <RCTSajjadBlurOverlay {...this.props} style={[this.props.customStyles,styles.style]}>
                 <View style={[this.props.customStyles,styles.style]}>
                     {children}
