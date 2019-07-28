@@ -1,23 +1,17 @@
-require 'json'
-
-package = JSON.parse(File.read(File.join(__dir__, '../package.json')))
 
 Pod::Spec.new do |s|
   s.name         = "SajjadBlurOverlay"
-  s.version      = package['version']
+  s.version      = "1.0.0"
   s.summary      = "SajjadBlurOverlay"
-  s.description  = package['description']
-  s.homepage     = package['homepage']
-  s.license      = package['license']
+  s.homepage     = "https://github.com/Long2k1708/react-native-blur-overlay"
+  s.license      = "MIT"
   s.author       = { "author" => "author@domain.cn" }
   s.platform     = :ios, "7.0"
-  s.source       = { :git => "https://github.com/author/SajjadBlurOverlay.git", :tag => "master" }
-  s.source_files  = "SajjadBlurOverlay/**/*.{h,m}"
-  s.requires_arc = true
-
+  s.source       = { :git => "https://github.com/Long2k1708/react-native-blur-overlay", :tag => "master" }
+  s.source_files = "*.{h,m}"
 
   s.dependency "React"
-  #s.dependency "others"
 
 end
+
   
