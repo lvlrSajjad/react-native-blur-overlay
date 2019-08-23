@@ -58,7 +58,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "1.0.4",
+  "version": "1.0.7",
   "dependencies": {
     "tiny-emitter": "^2.0.2"
   }
