@@ -18,9 +18,8 @@
 
 #### iOS
 
-1. In XCode right click on project's name and choose Add Files to..
-2. Go to node_modules/react-native-blur-overlay and select ios folder
-   Now you're ready to require('react-native-blur-overlay') inside your app!
+1. `react-native link`
+2. cd to ios folder and run `pod install`
 
 
 #### Android
@@ -131,19 +130,17 @@ const styles = StyleSheet.create({
   
   
   
-  ## Props
-  ```
-  android only:
-   radius : Int (Between  0 to 25*downsampling)
-   downsampling : float (>= 1)
-   brightness : float (Between -255 to 255 , 0 = nochange)
+## Props
+```
+android only:
+  radius : Int (Between  0 to 25*downsampling)
+  downsampling : float (>= 1)
+  brightness : float (Between -255 to 255 , 0 = nochange)
   
-  ios only : 
-    blurStyle: string ("light" , "extraLight" , "dark")
+ios only : 
+  blurStyle: string ("light" , "extraLight" , "dark")
 	
-  both platforms :
-    onPress : func
-    customStyles: style
-
-	  
+both platforms :
+  onPress : func
+  customStyles: style	  
 ```
