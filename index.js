@@ -13,7 +13,7 @@ var iface = {
         downsampling: PropTypes.number,
         blurStyle: PropTypes.string,
         vibrant: PropTypes.bool,
-        fadeDuration: PropTypes.number,
+        onPress: PropTypes.func,
     }
 };
 var RCTSajjadBlurOverlay = Platform.select({
