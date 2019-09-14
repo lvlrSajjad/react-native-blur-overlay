@@ -13,6 +13,7 @@ var iface = {
         downsampling: PropTypes.number,
         blurStyle: PropTypes.string,
         vibrant: PropTypes.bool,
+        onPress: PropTypes.func,
     }
 };
 var RCTSajjadBlurOverlay = Platform.select({
@@ -38,7 +39,7 @@ export default class BlurOverlay extends React.Component {
                 this.state.fadeIn,
                 {
                     toValue: 1,
-                    duration: 500,
+                    duration: this.props.fadeDuration !== undefined ? this.props.fadeDuration : 500,
                     useNativeDriver: true
                 }
             ).start();
@@ -49,7 +50,7 @@ export default class BlurOverlay extends React.Component {
             this.state.fadeIn,
             {
                 toValue: 0,
-                duration: 500,
+                duration: this.props.fadeDuration !== undefined ? this.props.fadeDuration : 500,
                 useNativeDriver: true
             }
         ).start(()=>this.setState({showBlurOverlay: false}));
