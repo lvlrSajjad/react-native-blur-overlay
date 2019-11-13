@@ -21,7 +21,7 @@ var iface = {
     downsampling: PropTypes.number,
     blurStyle: PropTypes.string,
     vibrant: PropTypes.bool,
-    idProp: PropTypes.string
+    idBlur: PropTypes.string
   }
 };
 var RCTSajjadBlurOverlay = Platform.select({
@@ -61,12 +61,12 @@ export default class BlurOverlay extends React.Component {
     }).start(() => this.setState({ showBlurOverlay: false }));
   }
   componentDidMount() {
-    emitter.on("drawer-open" + this.props.idProp, this._openOverlay);
-    emitter.on("drawer-close" + this.props.idProp, this._closeOverlay);
+    emitter.on("drawer-open" + this.props.idBlur, this._openOverlay);
+    emitter.on("drawer-close" + this.props.idBlur, this._closeOverlay);
   }
   componentWillUnmount() {
-    emitter.off("drawer-open" + this.props.idProp, this._openOverlay);
-    emitter.off("drawer-close" + this.props.idProp, this._closeOverlay);
+    emitter.off("drawer-open" + this.props.idBlur, this._openOverlay);
+    emitter.off("drawer-close" + this.props.idBlur, this._closeOverlay);
   }
 
   render() {
@@ -105,9 +105,9 @@ const styles = StyleSheet.create({
     zIndex: 999
   }
 });
-export function openOverlay() {
-  emitter.emit("drawer-open" + this.props.idProp);
+export function openOverlay(idBlur) {
+  emitter.emit("drawer-open" + idBlur);
 }
-export function closeOverlay() {
-  emitter.emit("drawer-close" + this.props.idProp);
+export function closeOverlay(idBlur) {
+  emitter.emit("drawer-close" + idBlur);
 }
