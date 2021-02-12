@@ -89,6 +89,7 @@ export default class BlurOverlay extends React.Component {
       </Animated.View>
     ) : null
   }
+
 }
 
 const styles = StyleSheet.create({
