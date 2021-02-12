@@ -50,8 +50,7 @@
   "name": "react-native-blur-overlay",
   "optionalDependencies": {},
   "peerDependencies": {
-    "react-native": "^0.41.2",
-    "react-native-windows": "0.41.0-rc.1"
+    "react-native": "^0.63.4"
   },
   "homepage": "https://github.com/lvlrSajjad/react-native-blur-overlay",
   "readme": "ERROR: No README data found!",
