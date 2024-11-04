@@ -1,15 +1,17 @@
-#import "SajjjadBlurOverlayManager.h"
+#import "SajjadBlurOverlayManager.h"
 
 @implementation SajjadBlurOverlayManager
 
-RCT_EXPORT_MODULE();
+RCT_EXPORT_MODULE(SajjadBlurOverlay);
 
 - (UIView *)view
 {
     return [[SajjadBlurOverlay alloc] init];
 }
 
-RCT_EXPORT_VIEW_PROPERTY(blurStyle, NSString);
-RCT_EXPORT_VIEW_PROPERTY(vibrant, BOOL);
+RCT_EXPORT_VIEW_PROPERTY(brightness, NSNumber);
+RCT_EXPORT_VIEW_PROPERTY(radius, NSNumber);
+RCT_EXPORT_VIEW_PROPERTY(downsampling, NSNumber);
+RCT_EXPORT_VIEW_PROPERTY(onPress, RCTBubblingEventBlock);
 
 @end

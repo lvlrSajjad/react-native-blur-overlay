@@ -8,38 +8,9 @@
 ## Getting started
 
 `$ npm install react-native-blur-overlay --save`
+OR
 
-### Mostly automatic installation
-
-`$ react-native link react-native-blur-overlay`
-
-### Manual installation
-
-
-#### iOS
-
-1. `react-native link`
-2. cd to ios folder and run `pod install`
-
-
-#### Android
-
-**Blur Only works on Android >= 17 !!! Brightness and should work everywhere though**
-
-1. Open up `android/app/src/main/java/[...]/MainApplication.java`
-  - Add `import com.bluroverly.SajjadBlurOverlayPackage;` to the imports at the top of the file
-  - Add `new SajjadBlurOverlayPackage()` to the list returned by the `getPackages()` method
-2. Append the following lines to `android/settings.gradle`:
-  	```
-      include ':react-native-blur-overlay'
-      project(':react-native-blur-overlay').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-blur-overlay/android')
-
-  	```
-3. Insert the following lines inside the dependencies block in `android/app/build.gradle`:
-  	```
-      compile project(':react-native-blur-overlay')
-  	```
-
+`$ yarn add react-native-blur-overlay`
 
 ## Usage
 ```javascript
@@ -89,8 +60,9 @@ export default class App extends Component<Props> {
                     radius={14}
                     downsampling={2}
                     brightness={-200}
+					idBlur={'ID_BLUR'}
                     onPress={() => {
-                        closeOverlay();
+                        closeOverlay('ID_BLUR');
                     }}
                     customStyles={{alignItems: 'center', justifyContent: 'center'}}
                     blurStyle="dark"

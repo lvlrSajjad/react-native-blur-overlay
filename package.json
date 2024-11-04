@@ -40,7 +40,7 @@
     "overlay"
   ],
   "license": "MIT",
-  "main": "index.js",
+  "main": "index.tsx",
   "maintainers": [
     {
       "name": "lvlrsajjad",
@@ -50,15 +50,12 @@
   "name": "react-native-blur-overlay",
   "optionalDependencies": {},
   "peerDependencies": {
-    "react-native": "^0.63.4"
+    "react-native": "^0.75.3"
   },
   "homepage": "https://github.com/lvlrSajjad/react-native-blur-overlay",
   "readme": "ERROR: No README data found!",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "1.0.7",
-  "dependencies": {
-    "tiny-emitter": "^2.0.2"
-  }
+  "version": "2.0.0"
 }

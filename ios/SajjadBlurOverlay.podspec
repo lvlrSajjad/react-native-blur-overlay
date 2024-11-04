@@ -1,7 +1,7 @@
 
 Pod::Spec.new do |s|
   s.name         = "SajjadBlurOverlay"
-  s.version      = "1.0.0"
+  s.version      = "2.0.0"
   s.summary      = "SajjadBlurOverlay"
   s.homepage     = "https://github.com/lvlrSajjad/react-native-blur-overlay"
   s.license      = "MIT"
@@ -10,6 +10,6 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/lvlrSajjad/react-native-blur-overlay", :tag => "master" }
   s.source_files = "*.{h,m}"
 
-  s.dependency "React"
+  s.dependency "React-Core"
 
 end

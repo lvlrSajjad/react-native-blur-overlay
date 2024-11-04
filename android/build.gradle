@@ -1,46 +1,42 @@
-def safeExtGet = {prop, fallback ->
+def safeExtGet = { prop, fallback ->
     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
 
 buildscript {
-    // The Android Gradle plugin is only required when opening the android folder stand-alone.
-    // This avoids unnecessary downloads and potential conflicts when the library is included as a
-    // module dependency in an application project.
-    if (project == rootProject) {
-        repositories {
-            google()
-            jcenter()
-        }
+    repositories {
+        google()
+        mavenCentral()
+    }
 
-        dependencies {
-            classpath("com.android.tools.build:gradle:3.5.3")
-        }
+    dependencies {
+        classpath("com.android.tools.build:gradle:7.0.4") // Use a recent Gradle version
     }
 }
 
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion safeExtGet('compileSdkVersion', 28)
-    buildToolsVersion safeExtGet('buildToolsVersion', '28.0.3')
-
+    compileSdkVersion safeExtGet('compileSdkVersion', 31) // Update to a recent SDK version
     defaultConfig {
-        minSdkVersion safeExtGet('minSdkVersion', 16)
-        targetSdkVersion safeExtGet('targetSdkVersion', 28)
+        minSdkVersion safeExtGet('minSdkVersion', 21) // Update to a reasonable min SDK
+        targetSdkVersion safeExtGet('targetSdkVersion', 31)
         versionCode 1
         versionName "1.0"
     }
+
+    buildToolsVersion safeExtGet('buildToolsVersion', '31.0.0') // Update build tools version
+
     lintOptions {
         abortOnError false
     }
 }
 
 repositories {
-	google()
+    google()
     mavenCentral()
 }
 
 dependencies {
-    compile 'com.facebook.react:react-native:+'
+    // Use implementation instead of compile (deprecated)
+    implementation 'com.facebook.react:react-native:+'
 }
-  
