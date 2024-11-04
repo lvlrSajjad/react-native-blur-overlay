@@ -5,12 +5,22 @@
 <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/giphy.gif" width="250">   <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/Untitled.jpg" width="250">  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/Untitled2.jpg" width="250">
 
 
+The new version is compatible with the latest react native version (0.75.3)
+
+
 ## Getting started
 
 `$ npm install react-native-blur-overlay --save`
 OR
 
 `$ yarn add react-native-blur-overlay`
+
+Do not forget to add this to your Podfile
+
+`pod 'SajjadBlurOverlay', :path => '../node_modules/react-native-blur-overlay/ios'`
+
+And this to your android main application
+`add(SajjadBlurOverlayPackage())`
 
 ## Usage
 ```javascript
