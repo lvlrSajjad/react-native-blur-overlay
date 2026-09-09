@@ -38,13 +38,11 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
     _containerView.backgroundColor = UIColor.clearColor;
     _containerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
-#ifdef RCT_NEW_ARCH_ENABLED
-    // Fabric mounts children into `contentView` and keeps its frame in sync,
-    // which is exactly what the container needs to be.
-    self.contentView = _containerView;
-#else
+    // Deliberately not `self.contentView`: React Native clears that when it
+    // recycles a component view, which would orphan the container while
+    // `betterHitTest:` kept looking for children inside it. Children are
+    // routed here by the mounting methods below instead.
     [self addSubview:_containerView];
-#endif
 
     [self applyEffect];
   }
@@ -58,9 +56,7 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
 
   _blurView.frame = self.bounds;
   _vibrancyView.frame = self.bounds;
-#ifndef RCT_NEW_ARCH_ENABLED
   _containerView.frame = self.bounds;
-#endif
 }
 
 #pragma mark - Effect
@@ -169,6 +165,16 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
              vibrant:newViewProps.vibrant];
 
   [super updateProps:props oldProps:oldProps];
+}
+
+- (void)mountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
+{
+  [_containerView insertSubview:childComponentView atIndex:index];
+}
+
+- (void)unmountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
+{
+  [childComponentView removeFromSuperview];
 }
 
 - (void)prepareForRecycle

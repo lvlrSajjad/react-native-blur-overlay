@@ -89,7 +89,14 @@ for architecture in new legacy; do
   for source in ios/*.mm ios/*.m; do
     echo "Checking $source ($architecture architecture)"
 
-    if ! xcrun clang -fsyntax-only -x objective-c++ -std=c++20 -fobjc-arc -Wall \
+    # Match Xcode: .m is Objective-C, .mm is Objective-C++. Compiling both as
+    # C++ would hide a C++ header leaking into an Objective-C file.
+    case "$source" in
+      *.mm) language=(-x objective-c++ -std=c++20) ;;
+      *) language=(-x objective-c) ;;
+    esac
+
+    if ! xcrun clang -fsyntax-only "${language[@]}" -fobjc-arc -Wall \
       -isysroot "$SDK" -target arm64-apple-ios15.1-simulator \
       "${defines[@]}" "${INCLUDES[@]}" "$source"; then
       status=1

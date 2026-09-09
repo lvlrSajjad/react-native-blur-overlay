@@ -30,6 +30,17 @@ jobs:
       - name: Build
         run: npx bob build
 
+      - name: Typecheck the example app
+        run: npx tsc -p example --noEmit
+
+      - name: Bundle the example app
+        working-directory: example
+        run: |
+          npx react-native bundle --entry-file index.js --platform android \
+            --dev false --bundle-output /tmp/bundle.android.js
+          npx react-native bundle --entry-file index.js --platform ios \
+            --dev false --bundle-output /tmp/bundle.ios.js
+
   android:
     name: Compile the Android sources
     runs-on: ubuntu-latest
@@ -52,6 +63,12 @@ jobs:
 
       - name: Compile against React Native's Android classes
         run: ./scripts/check-android.sh
+
+      - name: Build the example app
+        working-directory: example/android
+        run: ./gradlew :app:assembleDebug --no-daemon
+        env:
+          JAVA_TOOL_OPTIONS: -Xmx4g
 
   ios:
     name: Check the iOS sources

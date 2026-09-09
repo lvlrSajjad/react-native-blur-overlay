@@ -1,0 +1,32 @@
+// The example is an npm workspace, so React Native and its Gradle plugin are
+// hoisted to the repository root: ../../node_modules rather than the
+// ../node_modules a standalone app would use. Plugin resolution has to be
+// spelled out as a literal path (Gradle allows no statements before the
+// plugins {} block), while the paths further down are resolved through Node.
+pluginManagement { includeBuild("../../node_modules/@react-native/gradle-plugin") }
+
+plugins { id("com.facebook.react.settings") }
+
+extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
+  ex.autolinkLibrariesFromCommand()
+}
+
+rootProject.name = 'BlurOverlayExample'
+include ':app'
+
+includeBuild("../../node_modules/@react-native/gradle-plugin")
+
+def resolveNodeModule = { String name ->
+  def resolved = providers.exec {
+    commandLine(
+      "node",
+      "--print",
+      "require.resolve('${name}/package.json', { paths: ['${settingsDir}'] })"
+    )
+  }.standardOutput.asText.get().trim()
+
+  return new File(resolved).getParentFile()
+}
+
+gradle.ext.reactNativeDir = resolveNodeModule("react-native")
+gradle.ext.reactNativeCodegenDir = resolveNodeModule("@react-native/codegen")

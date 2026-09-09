@@ -1,8 +1,11 @@
 #import "SajjadBlurOverlayManager.h"
 
-#import "SajjadBlurOverlay.h"
-
 #ifndef RCT_NEW_ARCH_ENABLED
+
+// Imported inside the guard on purpose: on the new architecture the view
+// header derives from RCTViewComponentView and pulls in C++, which cannot be
+// compiled as part of this Objective-C file.
+#import "SajjadBlurOverlay.h"
 
 @implementation SajjadBlurOverlayManager
 

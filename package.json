@@ -1,6 +1,6 @@
 {
   "name": "react-native-blur-overlay",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "A native blur overlay for React Native — blurs whatever is behind it on iOS and Android",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -35,7 +35,11 @@
     "typecheck": "tsc",
     "test": "jest",
     "check:android": "./scripts/check-android.sh",
-    "check:ios": "./scripts/check-ios.sh"
+    "check:ios": "./scripts/check-ios.sh",
+    "example": "npm run --workspace react-native-blur-overlay-example",
+    "example:android": "npm run --workspace react-native-blur-overlay-example android",
+    "example:ios": "npm run --workspace react-native-blur-overlay-example ios",
+    "example:start": "npm run --workspace react-native-blur-overlay-example start"
   },
   "keywords": [
     "react-native",
@@ -115,5 +119,8 @@
         }
       }
     }
-  }
+  },
+  "workspaces": [
+    "example"
+  ]
 }

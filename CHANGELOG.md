@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.0.1
+
+Two iOS bugs that 3.0.0 shipped with, both found by building and running the
+new example app on a simulator. Android was unaffected.
+
+### Fixed
+
+- **iOS builds on the New Architecture failed**: `SajjadBlurOverlayManager.m`
+  is compiled as Objective-C but imported the view header, which derives from
+  `RCTViewComponentView` and pulls in C++ (`'atomic' file not found`). The
+  import now lives inside the legacy-architecture guard, where it belongs.
+- **Nothing inside the overlay responded to presses on iOS**: the view handed
+  its children container to React Native as `contentView`, but React Native
+  clears that when it recycles a component view — leaving an empty container
+  that `betterHitTest:` searched (and that `applyEffect` kept re-adding on
+  top), so every touch was attributed to the overlay itself. The container is
+  now owned by the view, with children routed into it by
+  `mountChildComponentView:index:`.
+
+### Added
+
+- An example app under `example/`, wired up as an npm workspace, that exercises
+  every prop on both platforms. CI typechecks it, bundles it for both platforms
+  and builds the Android app.
+- `scripts/check-ios.sh` now compiles `.m` as Objective-C and `.mm` as
+  Objective-C++, the way Xcode does — compiling everything as C++ is what let
+  the bug above through.
+
 ## 3.0.0
 
 A maintenance release: both native implementations were rewritten, the JS API

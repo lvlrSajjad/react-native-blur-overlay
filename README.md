@@ -6,7 +6,14 @@
 
 A native blur overlay for React Native: it blurs whatever is rendered behind it and lets you put your own content on top.
 
-<img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/giphy.gif" width="250">   <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/Untitled.jpg" width="250">  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/Untitled2.jpg" width="250">
+<p>
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-overlay.png" width="230" alt="iOS: a dark UIVisualEffectView blur behind a card">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-material.png" width="230" alt="iOS: the systemChromeMaterial blur style">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-overlay.png" width="230" alt="Android: a blurred, darkened overlay behind a card">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-partial.png" width="230" alt="Android: an overlay blurring only its own box">
+</p>
+
+<sub>The <a href="./example">example app</a> on the New Architecture — iOS with <code>blurStyle="dark"</code> and <code>systemChromeMaterial</code>, then Android full-screen and blurring only its own box.</sub>
 
 - Works on the **New Architecture** (Fabric, via Codegen) and on the legacy architecture
 - TypeScript types included
@@ -216,6 +223,21 @@ Blurring a full-screen snapshot costs the most on Android. Raise `downsampling` 
 - **`onPress` no longer fires for presses on your children.** Pass `closeOnChildPress` to get the old behaviour.
 - **Android props behave the same**, but `radius` is now capped at 25 after downsampling.
 - 2.x published `index.tsx` as the package entry point and imported Node's `events` module, which Metro cannot resolve; 3.0 ships a compiled build with type definitions.
+
+## Example app
+
+The repo ships a small app that exercises every prop — imperative and
+declarative opening, the iOS blur styles, the Android radius/downsampling, a
+partial-screen overlay and press handling:
+
+```bash
+npm install
+npm run example:start     # in one terminal
+npm run example:android   # or: npm run example:ios
+```
+
+It is an npm workspace of the library and Metro resolves the library to its
+TypeScript sources, so editing `src/` refreshes the app without a rebuild.
 
 ## Contributing
 
