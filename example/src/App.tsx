@@ -41,6 +41,7 @@ export default function App() {
   const [radius, setRadius] = useState(14);
   const [downsampling, setDownsampling] = useState(2);
   const [alwaysOn, setAlwaysOn] = useState(false);
+  const [glass, setGlass] = useState(false);
 
   const menu = useRef<BlurOverlayInstance>(null);
 
@@ -70,6 +71,11 @@ export default function App() {
           <Button
             label="Blur one corner"
             onPress={() => openOverlay('corner')}
+          />
+          <Button
+            label={glass ? 'Hide glass panel' : 'Glass panel'}
+            selected={glass}
+            onPress={() => setGlass((value) => !value)}
           />
         </Section>
 
@@ -144,7 +150,28 @@ export default function App() {
         </View>
       </BlurOverlay>
 
-      {/* 3. Fully declarative. */}
+      {/* 3. A frosted glass panel: the overlay is the glass, and a rounded,
+              overflow-hidden parent clips it to shape on both platforms. */}
+      <View pointerEvents="box-none" style={styles.glassClip}>
+        <BlurOverlay
+          visible={glass}
+          blurStyle="systemThinMaterial"
+          radius={20}
+          downsampling={2}
+          brightness={-16}
+          fadeDuration={220}
+        >
+          <View style={styles.glassInner}>
+            <Text style={styles.glassTitle}>Frosted glass</Text>
+            <Text style={styles.glassText}>
+              A rounded, overflow-hidden parent clips the blur into a glass
+              panel — the same code on iOS and Android.
+            </Text>
+          </View>
+        </BlurOverlay>
+      </View>
+
+      {/* 4. Fully declarative. */}
       <BlurOverlay
         visible={alwaysOn}
         blurStyle={blurStyle}
@@ -269,6 +296,28 @@ const styles = StyleSheet.create({
   },
   cornerLabel: { paddingHorizontal: 16 },
   cornerText: { color: 'white', fontWeight: '700', textAlign: 'center' },
+  glassClip: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 40,
+    height: 190,
+    borderRadius: 28,
+    // Clips the blurred surface into the panel's shape.
+    overflow: 'hidden',
+  },
+  glassInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.35)',
+    justifyContent: 'center',
+    padding: 22,
+    gap: 8,
+  },
+  glassTitle: { color: 'white', fontSize: 18, fontWeight: '700' },
+  glassText: { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20 },
   bottomSheet: {
     top: 'auto',
     height: 220,

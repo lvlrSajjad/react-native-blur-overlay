@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Documented frosted-glass panels — sizing the overlay to a rounded,
+  `overflow: 'hidden'` box gives an iOS-material-style glass surface on both
+  platforms — with a demo in the example app and screenshots from both.
+- Noted that on Android `borderRadius`, `borderWidth` and `backgroundColor`
+  set on the overlay itself are not applied, because the blurred snapshot is
+  drawn as the view's background; the rounding belongs on the parent.
+
 ## 3.0.1
 
 Two iOS bugs that 3.0.0 shipped with, both found by building and running the

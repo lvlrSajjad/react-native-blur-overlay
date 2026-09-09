@@ -4,17 +4,18 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-blur-overlay.svg)](https://www.npmjs.com/package/react-native-blur-overlay)
 [![license](https://img.shields.io/npm/l/react-native-blur-overlay.svg)](./LICENSE)
 
-A native blur overlay for React Native: it blurs whatever is rendered behind it and lets you put your own content on top.
+A native blur overlay for React Native: it blurs whatever is rendered behind it and lets you put your own content on top — full-screen, or just one rounded panel, which is the closest you can get to iOS's frosted-glass materials on Android.
 
 <p>
-  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-overlay.png" width="230" alt="iOS: a dark UIVisualEffectView blur behind a card">
-  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-material.png" width="230" alt="iOS: the systemChromeMaterial blur style">
-  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-overlay.png" width="230" alt="Android: a blurred, darkened overlay behind a card">
-  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-partial.png" width="230" alt="Android: an overlay blurring only its own box">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-glass.png" width="220" alt="iOS: a rounded frosted-glass panel">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-glass.png" width="220" alt="Android: the same rounded frosted-glass panel">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-overlay.png" width="220" alt="iOS: a full-screen dark blur behind a card">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-overlay.png" width="220" alt="Android: a full-screen blurred, darkened overlay behind a card">
 </p>
 
-<sub>The <a href="./example">example app</a> on the New Architecture — iOS with <code>blurStyle="dark"</code> and <code>systemChromeMaterial</code>, then Android full-screen and blurring only its own box.</sub>
+<sub>The <a href="./example">example app</a> on the New Architecture. The first two are <strong>the same glass panel, same code</strong>, on iOS and Android; then a full-screen overlay on each.</sub>
 
+- **Frosted-glass panels on both platforms** — the same code that gives you a `UIVisualEffectView` material on iOS gives you a matching glass panel on Android
 - Works on the **New Architecture** (Fabric, via Codegen) and on the legacy architecture
 - TypeScript types included
 - Autolinked — no Podfile or `MainApplication` edits
@@ -176,14 +177,75 @@ import BlurOverlay, {
 
 - The blur is a **still image** — content that animates behind the overlay is not re-blurred. Close and re-open (or remount) the overlay to refresh it.
 - The snapshot is cropped to the overlay's position on screen, so an overlay that covers part of the screen blurs exactly that part.
+- It is drawn as the view's background, which means `borderRadius`, `borderWidth` and `backgroundColor` on the overlay itself have no effect on Android — wrap the overlay in a rounded, `overflow: 'hidden'` parent instead.
 
 Blurring used to be done with RenderScript, which Android deprecated in Android 12 and no longer ships to new builds. 3.0 replaces it with a Stack Blur implementation that works on every supported API level.
 
 ## Recipes
 
+### Frosted-glass panels (iOS materials, on Android too)
+
+A blur overlay does not have to cover the screen. Size it to a box and you get
+a frosted-glass surface — a sheet, a card, a tab bar — on **both** platforms:
+
+```tsx
+// The parent's rounded corners are what shape the glass, on both platforms.
+const styles = StyleSheet.create({
+  clip: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 40,
+    height: 190,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  panel: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.35)',
+    justifyContent: 'center',
+    padding: 22,
+    gap: 8,
+  },
+});
+
+<View pointerEvents="box-none" style={styles.clip}>
+  <BlurOverlay
+    visible={showPanel}
+    blurStyle="systemThinMaterial" // iOS
+    radius={20} // Android
+    downsampling={2}
+    brightness={-16}
+  >
+    <View style={styles.panel}>
+      <Text style={styles.title}>Frosted glass</Text>
+      <Text style={styles.body}>Same code on iOS and Android.</Text>
+    </View>
+  </BlurOverlay>
+</View>
+```
+
+Two things to know:
+
+- **Put the rounding on the parent.** On Android the blurred snapshot is drawn
+  as the overlay's background, so `borderRadius`, `borderWidth` and
+  `backgroundColor` set on the overlay itself are not applied there — a
+  rounded, `overflow: 'hidden'` parent clips it on both platforms instead.
+- **On Android the glass is a still image** of what was behind the panel when
+  it appeared (see [How it works](#how-it-works-per-platform)), so it suits
+  panels that appear over settled content — sheets, dialogs, menus. Content
+  scrolling behind an already-visible panel will not re-blur. On iOS the same
+  panel is live.
+
 ### Blur only part of the screen
 
-Give the overlay an explicit position and size, or mount it inside the view you want blurred:
+Works on both platforms — iOS blurs whatever is behind the overlay's own frame,
+and Android crops its snapshot to the overlay's position on screen. Give the
+overlay an explicit position and size, or mount it inside the view you want
+blurred:
 
 ```tsx
 // Inside the view you want blurred — the overlay fills its parent:
