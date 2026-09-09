@@ -1,24 +1,36 @@
 package com.bluroverly;
 
-import com.facebook.react.ReactPackage;
-import com.facebook.react.bridge.JavaScriptModule;
+import androidx.annotation.Nullable;
+
+import com.facebook.react.BaseReactPackage;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.module.model.ReactModuleInfoProvider;
 import com.facebook.react.uimanager.ViewManager;
 
 import java.util.Collections;
 import java.util.List;
-public class SajjadBlurOverlayPackage implements ReactPackage {
 
-    @Override
-    public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
-      return Collections.emptyList();
-    }
+/**
+ * Registered automatically by autolinking. Manual registration in
+ * {@code MainApplication} keeps working, but is no longer needed.
+ */
+@SuppressWarnings("rawtypes") // ReactPackage declares a raw List<ViewManager>.
+public class SajjadBlurOverlayPackage extends BaseReactPackage {
 
-    @Override
-    public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
-        return Collections.<ViewManager>singletonList(
-                new SajjadBlurOverlayManager(reactContext)
-        );
-    }
+  @Override
+  public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
+    return Collections.singletonList(new SajjadBlurOverlayManager());
+  }
+
+  @Nullable
+  @Override
+  public NativeModule getModule(String name, ReactApplicationContext reactContext) {
+    return null;
+  }
+
+  @Override
+  public ReactModuleInfoProvider getReactModuleInfoProvider() {
+    return Collections::emptyMap;
+  }
 }

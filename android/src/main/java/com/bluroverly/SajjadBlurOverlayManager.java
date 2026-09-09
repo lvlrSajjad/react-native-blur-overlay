@@ -1,57 +1,77 @@
 package com.bluroverly;
 
-import android.app.Activity;
-import android.renderscript.RenderScript;
-import android.view.View;
-import com.facebook.react.bridge.ReactApplicationContext;
+import androidx.annotation.Nullable;
+
+import com.facebook.react.module.annotations.ReactModule;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.ViewGroupManager;
+import com.facebook.react.uimanager.ViewManagerDelegate;
 import com.facebook.react.uimanager.annotations.ReactProp;
-import com.facebook.react.views.view.ReactViewGroup;
+import com.facebook.react.viewmanagers.SajjadBlurOverlayManagerDelegate;
+import com.facebook.react.viewmanagers.SajjadBlurOverlayManagerInterface;
 
-public class SajjadBlurOverlayManager extends ViewGroupManager<ReactViewGroup> {
-    private static final String REACT_CLASS = "RCTSajjadBlurOverlay";
-    private final ReactApplicationContext reactContext;
-    private int mRadius = 20;
-    private float mBrightness = 0;
-    private float mFactor = 1;
-    private RenderScript rs;
-    SajjadBlurOverlayManager(ReactApplicationContext reactContext) {
-        this.reactContext = reactContext;
-        this.rs = RenderScript.create(reactContext);
-    }
+/**
+ * View manager for {@code <BlurOverlay />}. Implementing the Codegen interface
+ * keeps it working on both the new architecture (through the delegate) and the
+ * legacy one (through the {@code @ReactProp} annotations).
+ */
+@ReactModule(name = SajjadBlurOverlayManager.NAME)
+public class SajjadBlurOverlayManager extends ViewGroupManager<SajjadBlurOverlayView>
+    implements SajjadBlurOverlayManagerInterface<SajjadBlurOverlayView> {
 
-    @Override
-    public String getName() {
-        return REACT_CLASS;
-    }
+  public static final String NAME = "SajjadBlurOverlay";
 
-    @Override
-    protected ReactViewGroup createViewInstance(ThemedReactContext reactContext) {
-        return new ReactViewGroup(reactContext);
-    }
+  private final ViewManagerDelegate<SajjadBlurOverlayView> delegate =
+      new SajjadBlurOverlayManagerDelegate<SajjadBlurOverlayView, SajjadBlurOverlayManager>(this);
 
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
-    @ReactProp(name = "radius")
-    public void setRadius(ReactViewGroup view, int Radius) {
-        mRadius = Radius;
-    }
+  @Override
+  protected ViewManagerDelegate<SajjadBlurOverlayView> getDelegate() {
+    return delegate;
+  }
 
-    @ReactProp(name = "downsampling")
-    public void setRadius(ReactViewGroup view, float factor) {
-        mFactor = factor;
-    }
+  @Override
+  public SajjadBlurOverlayView createViewInstance(ThemedReactContext context) {
+    return new SajjadBlurOverlayView(context);
+  }
 
-    private void setBlurred(final View view){
-        final Activity activity = reactContext.getCurrentActivity();
-        if(activity==null) return;
-        new BlurTask(view,reactContext,rs,activity,mRadius,mFactor,mBrightness).execute();
-    }
+  @Override
+  public void onDropViewInstance(SajjadBlurOverlayView view) {
+    view.reset();
+    super.onDropViewInstance(view);
+  }
 
-    @ReactProp(name = "brightness")
-    public void setBrightness(ReactViewGroup view, float brightness) {
-        mBrightness = brightness;
-        setBlurred(view);
-        view.requestFocus();
-    }
+  @Override
+  @ReactProp(name = "radius", defaultInt = 20)
+  public void setRadius(SajjadBlurOverlayView view, int value) {
+    view.setBlurRadius(value);
+  }
+
+  @Override
+  @ReactProp(name = "downsampling", defaultFloat = 1f)
+  public void setDownsampling(SajjadBlurOverlayView view, float value) {
+    view.setDownsamplingFactor(value);
+  }
+
+  @Override
+  @ReactProp(name = "brightness", defaultFloat = 0f)
+  public void setBrightness(SajjadBlurOverlayView view, float value) {
+    view.setBrightnessOffset(value);
+  }
+
+  @Override
+  @ReactProp(name = "blurStyle")
+  public void setBlurStyle(SajjadBlurOverlayView view, @Nullable String value) {
+    // iOS only: Android renders a blurred snapshot rather than a UIBlurEffect.
+  }
+
+  @Override
+  @ReactProp(name = "vibrant")
+  public void setVibrant(SajjadBlurOverlayView view, boolean value) {
+    // iOS only.
+  }
 }
