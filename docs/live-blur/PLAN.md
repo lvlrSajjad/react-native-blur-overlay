@@ -135,6 +135,9 @@ just the numbers.
 - **Downscale:** reuse the existing `downsampling` prop; default 2 for live — Phase 0
   measured `RenderEffect` at inputScale 1.0 costing ~2ms on a Mali-G52 and 0.5 buying
   nearly all of it back, while 0.25 bought nothing further.
+- **Capture rect takes an inset/outset**, rather than being hard-wired to the overlay's
+  bounds. Live blur wants 0; the Phase 6 glass edge needs a bleed margin to refract from.
+  Costs nothing now, expensive once `<BlurTarget>` is public. See RESULTS.md.
 - Automatic fallback to snapshot below API 31, and whenever capture fails.
 
 **Opportunity while here:** drawing the blur ourselves instead of via `setBackground()`
@@ -184,6 +187,41 @@ Robolectric inconsistency flagged in the research).
 **Important:** Haze measured this path as *slower* on CPU than re-recording. Put it
 behind a flag, measure both on the same device, and only make it the default if it wins.
 
+### Phase 6 — Glass edge refraction (sketch, not scheduled)
+
+Prototyped 2026-09-16; see RESULTS.md for what was learned and what it looked like. Feasible
+on public API, visually close to iOS 26, **cost entirely unmeasured**. Not part of 3.1.0.
+
+**Depends on:** the `setBackground()` fix (Phase 1 or 3) — the shader needs the real corner
+radius — and on the capture rect accepting an outset.
+
+**Prop surface**, extending the existing opt-in ladder rather than adding a parallel one:
+
+```
+blurMode: "snapshot" (default) | "live" | "glass"
+glassFlatness: 0..1, default ~0.85     // only read when blurMode="glass"
+edgeBlur: dp, default ~35% of the blur radius
+```
+
+One enum rather than `blurMode="live"` plus a separate `glass` boolean: glass *requires* the
+live per-frame capture, so a boolean would let `snapshot + glass` be written, which cannot
+work. The enum makes it unrepresentable instead of a runtime validation.
+
+Each tier falls back to the one below it, so `blurMode="glass"` stays safe at minSdk 24:
+
+| Tier | Needs | Falls back to |
+| --- | --- | --- |
+| `glass` | API 33, `RuntimeShader` | `live` |
+| `live` | API 31, `RenderEffect` | `snapshot` |
+| `snapshot` | API 24 | — |
+
+**On iOS, do not port the shader.** iOS 26 ships a native glass effect in UIKit
+(`UIGlassEffect`); our iOS view is already a `UIVisualEffectView`, so adopting the system
+one is both cheaper and better. Verify against current docs before committing to it.
+
+**Before this is schedulable:** measure it on an API 33 device. It is 3 RenderNodes, an
+enlarged capture and 5 dependent texture reads per rim pixel.
+
 ### Phase 5 — Release 3.1.0
 
 Changelog, README, screenshots/GIF of live blur on both platforms, version bump, tag.
@@ -209,3 +247,4 @@ iOS-breaking bugs that compile checks did not catch.
 - Is the cadence cap visually acceptable at 30fps? At 20? (Phase 1)
 - Can the blur be drawn without `setBackground()`, restoring `borderRadius` support on
   Android? (Phase 1 or 3)
+- What does the glass edge cost on a real API 33 GPU? (Phase 6; nothing measured yet)

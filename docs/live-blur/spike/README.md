@@ -25,6 +25,34 @@ and needs no input injection.
 | `An` | same as A, flag disabled | control: shows what the flag is actually doing |
 | `B` | a subtree that excludes the panel | the `<BlurTarget>` shape |
 | `Bc` | same as B, `RenderEffect` skipped | isolates re-record cost from blur cost; runs on API 29–30 |
+| `G` | same as B, plus the AGSL glass edge | the Phase 6 prototype. API 33. |
+
+**Phase 0's numbers were measured before variant `G` existed.** The `off`/`A`/`An`/`B`/`Bc`
+paths were re-checked after glass landed and are unchanged (variant A still reports
+`exclDraw=1 firstExclFrame=1`, B still `exclDraw=0`, capture cost within noise), but if you
+need the exact harness that produced them, take the tree at the "Phase 0 passes" commit.
+
+### Variant G
+
+Three RenderNodes, not one: `captureNode` holds a sharp capture with a bleed margin,
+`frostNode` blurs it for the interior, `rimNode` refracts the same sharp pixels for the
+edge and is transparent everywhere else. Drawing frost then rim is what gets a crisp bevel
+over a frosted panel out of a single capture — refracting already-blurred pixels looks like
+a smudge.
+
+| Extra | Meaning |
+| --- | --- |
+| `--ef flatness` | 0..1. Derives band, bevel depth and sheen together. 1 = flat slab, 0 = deep bevel that domes the panel. ~0.85 matches iOS. |
+| `--ef radius` | interior frost. Independent of the rim. |
+| `--ef edgeBlur` | blur applied to the rim before refraction, separate from the interior. 0 = crisp bevel. Defaults to 35% of `radius`. Also removes the aliasing that extreme compression causes on high-frequency backdrops. |
+| `--ef bleed` | how far the capture extends past the panel. Must exceed the bevel depth. |
+| `--ef ior`, `--ef band`, `--ef thickness`, `--ef specular`, `--ef rim`, `--ef tint` | raw overrides, used when `flatness` is absent |
+| `--ez pill true`, `--ei panelH`, `--el tintColor`, `--ef elevation` | shape and styling |
+
+```bash
+adb shell am start -n com.bluespike/.SpikeActivity --es variant G --ei durationMs 0 \
+    --ez pill true --ei panelH 130 --ef corner 65 --ef flatness 0.85 --ef radius 12
+```
 
 The panel draws a magenta bar and the word PANEL. If the panel ever lands inside its own
 capture, a blurred magenta smear appears in the backdrop — the numbers alone will not show

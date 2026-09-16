@@ -67,7 +67,8 @@ public class SpikeActivity extends Activity {
 
         panel = new BlurPanel(this);
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(400));
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(getIntent().getIntExtra("panelH", 400)));
         plp.gravity = Gravity.CENTER_VERTICAL;
         plp.leftMargin = dp(16);
         plp.rightMargin = dp(16);
@@ -86,12 +87,19 @@ public class SpikeActivity extends Activity {
         llp.gravity = Gravity.CENTER;
         panel.addView(label, llp);
 
+        boolean pill = getIntent().getBooleanExtra("pill", false);
+        if (pill) {
+            label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
+            llp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            plp.leftMargin = dp(60);
+            plp.rightMargin = dp(60);
+        }
         View magenta = new View(this);
         magenta.setBackgroundColor(Color.MAGENTA);
         FrameLayout.LayoutParams mlp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
         mlp.gravity = Gravity.BOTTOM;
-        panel.addView(magenta, mlp);
+        if (!pill) panel.addView(magenta, mlp);
 
         hud = new TextView(this);
         hud.setBackgroundColor(0xCC000000);
@@ -109,11 +117,40 @@ public class SpikeActivity extends Activity {
         View content = findViewById(android.R.id.content);
         int mode = "A".equalsIgnoreCase(variant) ? BlurPanel.MODE_A
                 : "An".equalsIgnoreCase(variant) ? BlurPanel.MODE_A_NOEXCL
+                : "G".equalsIgnoreCase(variant) ? BlurPanel.MODE_GLASS
                 : "Bc".equalsIgnoreCase(variant) ? BlurPanel.MODE_B_CAPTURE_ONLY
                 : "B".equalsIgnoreCase(variant) ? BlurPanel.MODE_B
                 : BlurPanel.MODE_OFF;
         View target = (mode == BlurPanel.MODE_A || mode == BlurPanel.MODE_A_NOEXCL)
                 ? content : blurTarget;
+        float corner = getIntent().getFloatExtra("corner", 32f);
+        // narrow band + thick bevel == a FLAT slab with a sharp edge. A wide band ramps
+        // the bend across the whole panel and domes it, which is not what iOS does.
+        panel.setGlassParams(dp(corner),
+                dp(getIntent().getFloatExtra("band", 14f)),
+                dp(getIntent().getFloatExtra("thickness", 120f)),
+                getIntent().getFloatExtra("ior", 1.45f),
+                getIntent().getFloatExtra("specular", 0.55f),
+                getIntent().getFloatExtra("rim", 0.35f),
+                getIntent().getFloatExtra("tint", 0.03f),
+                dp(getIntent().getFloatExtra("bleed", 120f)));
+        panel.setElevation(dp(getIntent().getFloatExtra("elevation", 10f)));
+        panel.setTintColor((int) getIntent().getLongExtra("tintColor", 0L));
+        panel.setEdgeBlur(getIntent().hasExtra("edgeBlur")
+                ? dp(getIntent().getFloatExtra("edgeBlur", 0f)) : -1f);
+        panel.setFlatness(getIntent().getFloatExtra("flatness", -1f),
+                getResources().getDisplayMetrics().density);
+        if (mode == BlurPanel.MODE_GLASS) {
+            // round the panel itself so its children clip to the same shape the shader
+            // is refracting around
+            final float r = dp(corner);
+            panel.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override public void getOutline(View v, android.graphics.Outline o) {
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), r);
+                }
+            });
+            panel.setClipToOutline(true);
+        }
         panel.configure(mode, target, scale, dp(radiusDp));
 
         hud.setText(config());

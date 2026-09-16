@@ -13,6 +13,7 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
 | 3 — Fallbacks, props, docs | blocked on 1 | |
 | 4 — SDK 37.2 fast path | optional, any time after 1 | |
 | 5 — Release 3.1.0 | blocked on 1–3 | |
+| 6 — Glass edge refraction | sketched, not scheduled | prototyped 2026-09-16 and it works; cost unmeasured. Not in 3.1.0. Phase 1 only owes it an outset-capable capture rect. |
 
 ## Still owed after Phase 0
 
@@ -183,6 +184,11 @@ API 31 or when capture fails. Read the "Follow-ups Phase 1 must know" list in RE
 before writing the capture code — it records the exact RenderNode calls that worked and
 the one that did not.
 
+Let the capture rect take an inset/outset instead of hard-wiring it to the overlay bounds.
+Live blur passes 0. The Phase 6 glass prototype needs a bleed margin, and retrofitting that
+after <BlurTarget> is public is the expensive kind of change. That is the only thing Phase 6
+asks of Phase 1 — do not build any of the rest of it.
+
 Verify by running the example app on a device with the tile list scrolling behind the
 glass panel, and record frame numbers in RESULTS.md. Phase 0 measured the spike's plain-View
 numbers on a Galaxy A22 (15ms P90, 0% jank at 60Hz, inputScale 0.5); what Fabric adds on top
@@ -225,6 +231,21 @@ Add RenderNode.setBackdropRenderEffect behind a flag, gated on
 Build.VERSION.SDK_INT_FULL >= 3_700_002. Haze measured this path as 23–46% slower on CPU
 than re-recording, so measure both on the same device and only make it the default if it
 actually wins. Record the comparison in RESULTS.md.
+```
+
+### Phase 6
+
+```
+Work Phase 6 of docs/live-blur/PLAN.md — the glass edge. Read PLAN.md and the glass section
+of RESULTS.md first; a working prototype already exists as variant G in
+docs/live-blur/spike, so start by running it rather than from scratch.
+
+Do not start this before Phase 3: it needs the setBackground() fix for the corner radius.
+
+First job is the one thing the prototype never did — measure it on an API 33 device, both
+with and against blurMode="live", and record it in RESULTS.md. It is 3 RenderNodes, an
+enlarged capture and 5 dependent texture reads per rim pixel, so it may simply be too
+expensive. If it is, say so and stop.
 ```
 
 ### Phase 5

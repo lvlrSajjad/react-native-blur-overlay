@@ -39,6 +39,8 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     /** Variant B with the RenderEffect left off: isolates the cost of re-recording the
      *  target subtree from the cost of blurring it, and runs below API 31. */
     public static final int MODE_B_CAPTURE_ONLY = 4;
+    /** Variant B plus the AGSL glass edge (API 33). */
+    public static final int MODE_GLASS = 5;
 
     private static final String TAG = "BLURSPIKE";
 
@@ -46,11 +48,29 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     private View target;
     private float inputScale = 0.5f;
     private float radiusPx = 25f;
+    private float cornerPx = 96f;
+    private float bandPx = 48f;
+    private float strengthPx = 28f;
+    private float specular = 0.35f;
+    private float tint = 0.05f;
+    private float rim = 0.45f;
+    private float thicknessPx = 140f;
+    private float ior = 1.5f;
+    private int tintColor = 0;
+    /** -1 = use the raw band/thickness/specular. 0..1 = derive them. */
+    private float flatness = -1f;
+    private float density = 3f;
+    /** <0 = derive from the interior frost. Otherwise an absolute rim blur radius. */
+    private float edgeBlurPx = -1f;
+    private float bleedPx = 64f;
 
     /** Set while we are recording the target. Both draw overrides honour it. */
     private boolean capturing;
 
     private final RenderNode captureNode = new RenderNode("blur-capture");
+    /** Glass draws in two layers: a frosted interior, and a sharp refracted rim on top. */
+    private final RenderNode frostNode = new RenderNode("glass-frost");
+    private final RenderNode rimNode = new RenderNode("glass-rim");
     private final int[] targetLoc = new int[2];
     private final int[] selfLoc = new int[2];
 
@@ -66,6 +86,50 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     public BlurPanel(Context context) {
         super(context);
         setWillNotDraw(false);
+    }
+
+    public void setTintColor(int argb) { this.tintColor = argb; }
+
+    public void setEdgeBlur(float px) { this.edgeBlurPx = px; }
+
+    /**
+     * One knob instead of three. 1 = a flat slab with a shallow edge (the iOS look),
+     * 0 = a deep bevel that domes the whole panel.
+     *
+     * band and thickness have to move together -- setting them independently mostly
+     * produces either nothing visible or a dome -- so a public API should expose this and
+     * keep the other two internal.
+     *
+     * The bevel is absolute dp, not a fraction of the panel: a real sheet of glass has a
+     * physical edge thickness, and a bigger pane does not get a bigger bevel. Only the
+     * clamp below is size-relative, to stop a tiny panel being all edge.
+     */
+    public void setFlatness(float f, float density) {
+        this.flatness = f;
+        this.density = density;
+    }
+
+    private void applyFlatness(int w, int h) {
+        if (flatness < 0f) return;
+        float f = Math.max(0f, Math.min(1f, flatness));
+        float minHalf = Math.min(w, h) * 0.5f;
+        bandPx = Math.min(lerp(20f, 6f, f) * density, minHalf * 0.45f);
+        thicknessPx = Math.min(lerp(150f, 30f, f) * density, minHalf * 2.0f);
+        specular = lerp(0.85f, 0.30f, f);
+    }
+
+    private static float lerp(float a, float b, float t) { return a + (b - a) * t; }
+
+    public void setGlassParams(float cornerPx, float bandPx, float thicknessPx, float ior,
+                              float specular, float rim, float tint, float bleedPx) {
+        this.cornerPx = cornerPx;
+        this.bandPx = bandPx;
+        this.thicknessPx = thicknessPx;
+        this.ior = ior;
+        this.specular = specular;
+        this.rim = rim;
+        this.tint = tint;
+        this.bleedPx = bleedPx;
     }
 
     public void configure(int mode, View target, float inputScale, float radiusPx) {
@@ -95,6 +159,8 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     protected void onDetachedFromWindow() {
         getViewTreeObserver().removeOnPreDrawListener(this);
         captureNode.discardDisplayList();
+        frostNode.discardDisplayList();
+        rimNode.discardDisplayList();
         super.onDetachedFromWindow();
     }
 
@@ -111,8 +177,10 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
         int h = getHeight();
         if (w <= 0 || h <= 0) return;
 
-        int sw = Math.max(1, Math.round(w * inputScale));
-        int sh = Math.max(1, Math.round(h * inputScale));
+        if (mode == MODE_GLASS) applyFlatness(w, h);
+        float bleed = (mode == MODE_GLASS) ? bleedPx : 0f;
+        int sw = Math.max(1, Math.round((w + 2f * bleed) * inputScale));
+        int sh = Math.max(1, Math.round((h + 2f * bleed) * inputScale));
 
         target.getLocationInWindow(targetLoc);
         getLocationInWindow(selfLoc);
@@ -125,7 +193,7 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
         RecordingCanvas canvas = captureNode.beginRecording(sw, sh);
         try {
             canvas.scale(inputScale, inputScale);
-            canvas.translate(-dx, -dy);
+            canvas.translate(-(dx - bleed), -(dy - bleed));
             capturing = true;
             target.draw(canvas);
         } finally {
@@ -133,15 +201,74 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
             captureNode.endRecording();
         }
 
-        if (mode != MODE_B_CAPTURE_ONLY && Build.VERSION.SDK_INT >= 31) {
+        if (mode == MODE_GLASS && Build.VERSION.SDK_INT >= 33) {
+            buildGlassLayers(sw, sh, w * inputScale, h * inputScale, bleed * inputScale,
+                    inputScale, bleed);
+        } else if (mode != MODE_B_CAPTURE_ONLY && Build.VERSION.SDK_INT >= 31) {
             applyBlur(captureNode, Math.max(0.5f, radiusPx * inputScale));
         }
-        captureNode.setPivotX(0f);
-        captureNode.setPivotY(0f);
-        captureNode.setScaleX(1f / inputScale);
-        captureNode.setScaleY(1f / inputScale);
+
+        if (mode == MODE_GLASS) {
+            // frostNode/rimNode reference captureNode and carry the scale and bleed shift
+            // themselves. Leaving a transform on captureNode too would apply it twice.
+            captureNode.setScaleX(1f);
+            captureNode.setScaleY(1f);
+            captureNode.setTranslationX(0f);
+            captureNode.setTranslationY(0f);
+        } else {
+            captureNode.setPivotX(0f);
+            captureNode.setPivotY(0f);
+            captureNode.setScaleX(1f / inputScale);
+            captureNode.setScaleY(1f / inputScale);
+            captureNode.setTranslationX(-bleed);
+            captureNode.setTranslationY(-bleed);
+        }
 
         record(System.nanoTime() - t0);
+    }
+
+    /**
+     * captureNode stays sharp. frostNode blurs it for the interior; rimNode refracts the
+     * same sharp pixels for the edge and is transparent everywhere else. Drawing frost then
+     * rim is what gets a crisp bevel over a frosted panel out of a single capture.
+     */
+    @RequiresApi(33)
+    private void buildGlassLayers(int cw, int ch, float pw, float ph, float sBleed,
+                                  float scale, float bleedUnscaled) {
+        captureNode.setRenderEffect(null);
+
+        frostNode.setPosition(0, 0, cw, ch);
+        RecordingCanvas fc = frostNode.beginRecording(cw, ch);
+        fc.drawRenderNode(captureNode);
+        frostNode.endRecording();
+        frostNode.setRenderEffect(RenderEffect.createBlurEffect(
+                Math.max(0.5f, radiusPx * scale), Math.max(0.5f, radiusPx * scale),
+                Shader.TileMode.CLAMP));
+
+        rimNode.setPosition(0, 0, cw, ch);
+        RecordingCanvas rc = rimNode.beginRecording(cw, ch);
+        rc.drawRenderNode(captureNode);
+        rimNode.endRecording();
+        RenderEffect glass = Glass.rimEffect(pw, ph, sBleed,
+                cornerPx * scale, bandPx * scale, thicknessPx * scale, ior,
+                specular, rim, tint);
+        // The rim gets its OWN blur, separate from the interior frost. At 0 it refracts a
+        // sharp image; wound up, the bevel frosts too, which is what real frosted glass
+        // does. Blurring the whole capture instead -- one node for both -- is what made the
+        // early version look like a smudge, so keep these independent.
+        float edge = (edgeBlurPx < 0f ? radiusPx * 0.35f : edgeBlurPx) * scale;
+        rimNode.setRenderEffect(edge <= 0.5f ? glass
+                : RenderEffect.createChainEffect(glass,
+                        RenderEffect.createBlurEffect(edge, edge, Shader.TileMode.CLAMP)));
+
+        for (RenderNode n : new RenderNode[] { frostNode, rimNode }) {
+            n.setPivotX(0f);
+            n.setPivotY(0f);
+            n.setScaleX(1f / scale);
+            n.setScaleY(1f / scale);
+            n.setTranslationX(-bleedUnscaled);
+            n.setTranslationY(-bleedUnscaled);
+        }
     }
 
     /** Kept out of line so ART never resolves RenderEffect on an API 30 device. */
@@ -175,8 +302,16 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     @Override
     protected void onDraw(Canvas canvas) {
         if (mode == MODE_OFF) return;
-        if (canvas instanceof RecordingCanvas && captureNode.hasDisplayList()) {
-            ((RecordingCanvas) canvas).drawRenderNode(captureNode);
+        if (!(canvas instanceof RecordingCanvas)) return;
+        RecordingCanvas rc = (RecordingCanvas) canvas;
+        if (mode == MODE_GLASS) {
+            if (frostNode.hasDisplayList()) rc.drawRenderNode(frostNode);
+            // clipToOutline keeps this inside the rounded rect; the rim is drawn after so
+            // it keeps its own tint and stays the brightest thing on the panel
+            if (tintColor != 0) rc.drawColor(tintColor);
+            if (rimNode.hasDisplayList()) rc.drawRenderNode(rimNode);
+        } else if (captureNode.hasDisplayList()) {
+            rc.drawRenderNode(captureNode);
         }
     }
 

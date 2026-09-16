@@ -262,3 +262,73 @@ budget are now measured:
 - Still untested: **120Hz** (no 120Hz panel was available; 90Hz is the highest measured)
   and **what an RN Fabric hierarchy adds** over plain Views. Phase 1 still owes the Fabric
   number, measured in the example app rather than this harness.
+
+## Glass edge refraction — feasibility prototype — 2026-09-16
+
+**No performance numbers in this section.** Everything below is visual, from the Android 17
+emulator, whose frame timings this document has already established are unusable. The cost
+of this technique is entirely unmeasured. Nothing here may be quoted as a budget.
+
+Prototype: variant `G` in [`spike/`](./spike). API 33 (`RuntimeShader` +
+`RenderEffect.createRuntimeShaderEffect`), chained onto the Phase 0 capture. Public SDK
+only, so it stays inside constraint 1.
+
+### It works, and four things made the difference
+
+Side by side with iOS 26 Liquid Glass: [`glass-vs-ios.png`](./spike/evidence/glass-vs-ios.png).
+Same phenomenon, recognisably.
+
+1. **Refract outward, not inward.** A convex glass edge pulls the backdrop in from *outside*
+   the shape and squeezes a wide band into a thin rim. Sampling toward the centre produces
+   a smear with no lens character. This was the single biggest error.
+2. **The capture must bleed past the panel.** Direct consequence of (1): there is nothing
+   outside the border to pull in if the capture stops at the border. **This is the one
+   finding that constrains Phase 1** — see below.
+3. **Three RenderNodes, not one.** `captureNode` stays sharp; `frostNode` blurs it for the
+   interior; `rimNode` refracts the *same sharp pixels* for the edge and is transparent
+   elsewhere. Drawing frost then rim gives a crisp bevel over a frosted panel out of a
+   single capture. Refracting already-blurred pixels — one node for both — is what made the
+   first attempt look like a smudge, and had been flagged as the likely quality ceiling.
+   It is not a ceiling; it is an architecture choice.
+4. **Snell's law over a circular bevel**, `thickness * tan(θi - θr)`, rather than an invented
+   falloff. It diverges near the border, and that divergence is the hard squeeze that reads
+   as thick glass.
+
+Two smaller ones worth keeping: `flat` is a reserved word in AGSL and the compile error is a
+runtime `IllegalArgumentException`, not a build failure; and screen-space derivatives
+(`dFdx`/`dFdy`) are not dependable in AGSL, so edge normals come from a numerical SDF
+gradient. The numerical gradient is the better code but it was *not* the cause of the corner
+artefacts it was written to fix — those turned out to be the displacement sweeping across a
+hard colour boundary in the source, which is what a real lens does.
+
+### Parameters that matter, and the API they imply
+
+| Knob | Finding | Evidence |
+| --- | --- | --- |
+| `flatness` 0..1 | Band width and bevel depth **must move together**. Independently they give either nothing visible or a domed panel. One derived knob; ~0.85 matches iOS. | [`glass-flatness.png`](./spike/evidence/glass-flatness.png) |
+| interior blur | Works orthogonally — clear glass through to opaque frost with the bevel pixel-identical throughout. The existing `downsampling`/radius prop carries over unchanged. | [`glass-frost.png`](./spike/evidence/glass-frost.png) |
+| `edgeBlur` | The rim needs its *own* blur, independent of the interior. Also removes the aliasing that extreme compression causes on high-frequency backdrops — visible as striped ghost text at 0, gone by 4dp. | [`glass-edgeblur.png`](./spike/evidence/glass-edgeblur.png) |
+
+The bevel is **absolute dp, not a fraction of panel size**: a real sheet of glass has a
+physical edge thickness and a larger pane does not get a larger bevel.
+
+### What is still missing
+
+- **Cost.** Unmeasured, and not cheap-looking: 3 RenderNodes, an enlarged capture, and 5
+  dependent texture reads per rim pixel. Needs the A22 before any claim.
+- **Motion.** iOS ties the sheen to device tilt and morphs shape on interaction. This is a
+  static light direction.
+- **iOS parity is not the goal on iOS.** iOS 26 has a native glass effect in UIKit
+  (`UIGlassEffect`, a `UIVisualEffect` subclass) and our iOS side is already a
+  `UIVisualEffectView`. Adopt the system one there rather than porting this shader; verify
+  against current docs first.
+
+### Decision
+
+Not in 3.1.0. Recorded as a sketched **Phase 6** in PLAN.md, after the `setBackground()` fix
+it depends on.
+
+**The one thing Phase 1 must not get wrong:** the capture rect needs to take an
+inset/outset rather than being hard-wired to the overlay's bounds. Glass needs a bleed
+margin; live blur does not. Parameterising it now costs nothing, and retrofitting it after
+`<BlurTarget>` is public is the expensive kind of change.
