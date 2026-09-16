@@ -25,8 +25,6 @@ import androidx.annotation.RequiresApi;
 @RequiresApi(33)
 final class Glass {
 
-    private Glass() {}
-
     static final String AGSL =
         "uniform shader content;\n" +
         "uniform float2 uSize;\n" +
@@ -38,6 +36,7 @@ final class Glass {
         "uniform float uSpecular;\n" +
         "uniform float uRim;\n" +
         "uniform float uTint;\n" +
+        "uniform float uLineW;\n" +
         "\n" +
         "float sdRoundRect(float2 p, float2 h, float r) {\n" +
         "    float2 q = abs(p) - h + r;\n" +
@@ -80,16 +79,14 @@ final class Glass {
         "\n" +
         "    col.rgb += half3(uTint, uTint, uTint);\n" +
         "\n" +
-        // two specular lobes: a lit bevel is bright top-left and again bottom-right
+        // The shine lives ON the border, not spread across the rim. Liquid Glass draws a
+        // hairline stroke whose brightness varies around the perimeter with the light --
+        // modulating the whole band instead reads as a soft glow, which is wrong.
         "    float l1 = clamp(dot(n, normalize(float2(-0.55, -1.0))), 0.0, 1.0);\n" +
         "    float l2 = clamp(dot(n, normalize(float2(0.55, 1.0))), 0.0, 1.0);\n" +
-        "    float spec = pow(l1, 5.0) + 0.55 * pow(l2, 7.0);\n" +
-        "    spec *= smoothstep(0.15, 0.95, t) * uSpecular;\n" +
-        "    col.rgb += half3(half(spec));\n" +
-        "\n" +
-        // hairline border
-        "    float line = 1.0 - smoothstep(0.0, 2.0, abs(d + 1.0));\n" +
-        "    col.rgb += half3(half(line * uRim));\n" +
+        "    float lobes = pow(l1, 3.0) + 0.7 * pow(l2, 4.0);\n" +
+        "    float line = 1.0 - smoothstep(0.0, uLineW, abs(d + uLineW * 0.5));\n" +
+        "    col.rgb += half3(half(line * (uRim + lobes * uSpecular)));\n" +
         "\n" +
         // fade into the frosted interior at the inner lip, antialias at the border
         "    float inner = smoothstep(0.0, 0.35, t);\n" +
@@ -97,19 +94,36 @@ final class Glass {
         "    return col * half(inner * outer);\n" +
         "}\n";
 
-    static RenderEffect rimEffect(float w, float h, float bleed, float corner, float band,
-                                  float thickness, float ior,
-                                  float specular, float rim, float tint) {
-        RuntimeShader s = new RuntimeShader(AGSL);
-        s.setFloatUniform("uSize", w, h);
-        s.setFloatUniform("uBleed", bleed);
-        s.setFloatUniform("uRadius", corner);
-        s.setFloatUniform("uBand", band);
-        s.setFloatUniform("uThickness", thickness);
-        s.setFloatUniform("uIor", ior);
-        s.setFloatUniform("uSpecular", specular);
-        s.setFloatUniform("uRim", rim);
-        s.setFloatUniform("uTint", tint);
-        return RenderEffect.createRuntimeShaderEffect(s, "content");
+    // Constructing a RuntimeShader compiles the AGSL. Doing that per frame cost 4ms of UI
+    // thread on a Helio G80 -- 20x the whole capture -- and none of it was the effect. The
+    // shader is compiled once; the RenderEffect (immutable, so it cannot be mutated in
+    // place) is rebuilt only when a uniform actually changes, which during a scroll is
+    // never.
+    private RuntimeShader shader;
+    private RenderEffect cached;
+    private float[] last;
+
+    RenderEffect rimEffect(float w, float h, float bleed, float corner, float band,
+                           float thickness, float ior,
+                           float specular, float rim, float tint, float lineW) {
+        float[] now = { w, h, bleed, corner, band, thickness, ior, specular, rim, tint, lineW };
+        if (cached != null && last != null && java.util.Arrays.equals(now, last)) {
+            return cached;
+        }
+        if (shader == null) shader = new RuntimeShader(AGSL);
+        shader.setFloatUniform("uSize", w, h);
+        shader.setFloatUniform("uBleed", bleed);
+        shader.setFloatUniform("uRadius", corner);
+        shader.setFloatUniform("uBand", band);
+        shader.setFloatUniform("uThickness", thickness);
+        shader.setFloatUniform("uIor", ior);
+        shader.setFloatUniform("uSpecular", specular);
+        shader.setFloatUniform("uRim", rim);
+        shader.setFloatUniform("uTint", tint);
+        shader.setFloatUniform("uLineW", lineW);
+        cached = RenderEffect.createRuntimeShaderEffect(shader, "content");
+        last = now;
+        return cached;
     }
+
 }

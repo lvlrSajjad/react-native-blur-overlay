@@ -189,8 +189,14 @@ behind a flag, measure both on the same device, and only make it the default if 
 
 ### Phase 6 — Glass edge refraction (sketch, not scheduled)
 
-Prototyped 2026-09-16; see RESULTS.md for what was learned and what it looked like. Feasible
-on public API, visually close to iOS 26, **cost entirely unmeasured**. Not part of 3.1.0.
+Prototyped and **measured** 2026-09-16 on a Galaxy A22 (API 33, Mali-G52); see RESULTS.md.
+Feasible on public API, visually close to iOS 26, and affordable **only with downscaling**.
+Not part of 3.1.0.
+
+**Glass must clamp inputScale to ≤0.5.** At full resolution and 90Hz the effect collapses on
+low-end hardware: 42ms P90, 100% janky frames, scroll dropping 90fps → 70fps, identical
+across three runs. At 0.5 it holds 90fps at ~1% jank for about 6ms P90 over baseline. Do not
+trust a caller-supplied 1.0 here — clamp it.
 
 **Depends on:** the `setBackground()` fix (Phase 1 or 3) — the shader needs the real corner
 radius — and on the capture rect accepting an outset.
@@ -219,8 +225,13 @@ Each tier falls back to the one below it, so `blurMode="glass"` stays safe at mi
 (`UIGlassEffect`); our iOS view is already a `UIVisualEffectView`, so adopting the system
 one is both cheaper and better. Verify against current docs before committing to it.
 
-**Before this is schedulable:** measure it on an API 33 device. It is 3 RenderNodes, an
-enlarged capture and 5 dependent texture reads per rim pixel.
+**Already done:** the API 33 measurement, and it passes at inputScale 0.5. What remains
+before this is schedulable is the `setBackground()` dependency and UI iteration on the
+compression ratio — not a technical unknown.
+
+**Implementation note that cost 4ms when missed:** constructing a `RuntimeShader` compiles
+the AGSL. It must be built once and cached, with the immutable `RenderEffect` rebuilt only
+when a uniform changes. Doing it per frame cost 4.2ms of UI thread — 20x the entire capture.
 
 ### Phase 5 — Release 3.1.0
 
@@ -247,4 +258,5 @@ iOS-breaking bugs that compile checks did not catch.
 - Is the cadence cap visually acceptable at 30fps? At 20? (Phase 1)
 - Can the blur be drawn without `setBackground()`, restoring `borderRadius` support on
   Android? (Phase 1 or 3)
-- What does the glass edge cost on a real API 33 GPU? (Phase 6; nothing measured yet)
+- ~~What does the glass edge cost on a real API 33 GPU?~~ Measured 2026-09-16: fine at
+  inputScale 0.5, collapses at 1.0 on a Mali-G52 at 90Hz.

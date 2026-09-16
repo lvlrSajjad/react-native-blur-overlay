@@ -332,3 +332,79 @@ it depends on.
 inset/outset rather than being hard-wired to the overlay's bounds. Glass needs a bleed
 margin; live blur does not. Parameterising it now costs nothing, and retrofitting it after
 `<BlurTarget>` is public is the expensive kind of change.
+
+## Glass edge — measured on device — 2026-09-16
+
+The cost the section above said was unmeasured. Same device and method as the Phase 0
+device section: Galaxy A22 (SM-A225F), Android 13 / API 33, Helio G80 / Mali-G52 MC2,
+720×1600, release build, refresh pinned and restored, baseline interleaved, 3 repetitions,
+medians below.
+
+The shader renders correctly on Mali-G52 — no vendor divergence from the emulator, which
+was a real risk with AGSL.
+
+### Glass requires downscaling. It is not optional.
+
+60Hz (budget 16.6ms):
+
+| Config | P90 frame | Janky | Scroll |
+| --- | --- | --- | --- |
+| off — baseline | 11ms | ≤0.16% | 60fps |
+| live blur, inputScale 0.5 | 14–15ms | ≤0.16% | 60fps |
+| **glass, inputScale 1.0** | **24ms** | ≤0.32% | 60fps |
+| **glass, inputScale 0.5** | **20ms** | ≤0.16% | 60fps |
+
+90Hz (budget 11.1ms):
+
+| Config | P90 frame | Janky | Scroll |
+| --- | --- | --- | --- |
+| off — baseline | 13ms | ≤0.11% | 90fps |
+| live blur, inputScale 0.5 | 13ms | ≤0.33% | 90fps |
+| **glass, inputScale 1.0** | **42ms** | **100.00%** | **70fps** |
+| glass, inputScale 0.5 | 19ms | ≤1.09% | 90fps |
+
+**At 90Hz and full resolution the effect collapses**: every frame janky, frame duration
+nearly 4x the budget, and the scroll drops from 90fps to 70. All three repetitions were
+identical (42/42/42ms, 70.1/70.0/70.1fps), so this is a hard GPU limit, not the
+environmental noise documented earlier.
+
+At inputScale 0.5 it holds 90fps with about 1% jank, costing ~6ms P90 over baseline. So the
+feature is viable on low-end 2021 hardware **only** with downscaling, and any implementation
+should clamp rather than trust a caller-supplied 1.0.
+
+Worth noting at 60Hz: frame *duration* rises to 20–24ms while janky frames stay near zero
+and the scroll holds 60fps. Glass buys latency there, not dropped frames. The two metrics
+disagree and the jank percentage is the one that matches what the scroll actually did.
+
+### A 4ms self-inflicted wound, for the record
+
+The first 60Hz run measured glass capture at **4.2ms median, 5.3ms P90** against live blur's
+0.20ms — a 20x difference that had nothing to do with the effect. `RenderEffect.rimEffect()`
+called `new RuntimeShader(AGSL)` every frame, and constructing a RuntimeShader **compiles the
+AGSL**. Caching the compiled shader and rebuilding the immutable RenderEffect only when a
+uniform actually changes put capture back to 0.20ms, identical to live blur.
+
+All the numbers in the tables above are post-fix. Anyone extending this: `RuntimeShader`
+construction is compilation, and it must be hoisted out of the frame loop.
+
+### Three corrections to the section above
+
+1. **Band width and bevel depth move in OPPOSITE directions, not together.** The earlier
+   `flatness` mapping shrank both, which also shrinks the compression ratio — so a high
+   flatness produced a thin rim with almost no distortion left in it. What reads as glass is
+   a *thin* band sampling from *far* out; iOS looks like roughly 15:1. Mapping is now
+   band 20→4dp against depth 150→70dp. [`glass-rim-ratio.png`](./spike/evidence/glass-rim-ratio.png)
+2. **The sheen belongs on the border stroke, not spread across the band.** Liquid Glass draws
+   a hairline whose brightness varies around the perimeter with the light; modulating the
+   whole rim band instead reads as a soft glow, which is visibly wrong next to a real one.
+   The directional lobes now multiply the stroke.
+3. **Horizontal bands cannot test rim distortion.** They run parallel to a horizontal rim and
+   perpendicular to a vertical one, so in both cases the displacement slides *along* the
+   boundary and nothing appears to bend. The harness now has `--ez diag true`. Every rim
+   comparison before this was reading a backdrop that could not show the effect.
+
+### Status
+
+Feasible and affordable at inputScale 0.5, on the weakest hardware available. Still a
+Phase 6 sketch, still not in 3.1.0, and the remaining gap to iOS is the compression ratio
+and the aliasing under extreme squeeze — UI iteration, not a technical unknown.

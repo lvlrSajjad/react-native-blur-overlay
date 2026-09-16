@@ -62,6 +62,7 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     private float density = 3f;
     /** <0 = derive from the interior frost. Otherwise an absolute rim blur radius. */
     private float edgeBlurPx = -1f;
+    private float lineWidthPx = 5f;
     private float bleedPx = 64f;
 
     /** Set while we are recording the target. Both draw overrides honour it. */
@@ -71,6 +72,12 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     /** Glass draws in two layers: a frosted interior, and a sharp refracted rim on top. */
     private final RenderNode frostNode = new RenderNode("glass-frost");
     private final RenderNode rimNode = new RenderNode("glass-rim");
+    private Object glass;   // Glass, lazily created; API 33 only
+    private RenderEffect cachedFrostEffect;
+    private float cachedFrostRadius = -1f;
+    private RenderEffect cachedRimChain;
+    private float cachedEdge = -1f;
+    private RenderEffect cachedRimBase;
     private final int[] targetLoc = new int[2];
     private final int[] selfLoc = new int[2];
 
@@ -91,6 +98,8 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
     public void setTintColor(int argb) { this.tintColor = argb; }
 
     public void setEdgeBlur(float px) { this.edgeBlurPx = px; }
+
+    public void setLineWidth(float px) { this.lineWidthPx = px; }
 
     /**
      * One knob instead of three. 1 = a flat slab with a shallow edge (the iOS look),
@@ -113,9 +122,13 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
         if (flatness < 0f) return;
         float f = Math.max(0f, Math.min(1f, flatness));
         float minHalf = Math.min(w, h) * 0.5f;
-        bandPx = Math.min(lerp(20f, 6f, f) * density, minHalf * 0.45f);
-        thicknessPx = Math.min(lerp(150f, 30f, f) * density, minHalf * 2.0f);
-        specular = lerp(0.85f, 0.30f, f);
+        // Band and depth move in OPPOSITE directions. Shrinking both together (the first
+        // mapping) also shrinks the compression ratio, so a high flatness produced a thin
+        // rim with almost no distortion left in it. What reads as glass is a THIN band
+        // pulling from FAR out -- iOS runs something like 15:1.
+        bandPx = Math.min(lerp(20f, 4f, f) * density, minHalf * 0.45f);
+        thicknessPx = Math.min(lerp(150f, 70f, f) * density, minHalf * 2.0f);
+        specular = lerp(0.9f, 0.55f, f);
     }
 
     private static float lerp(float a, float b, float t) { return a + (b - a) * t; }
@@ -241,25 +254,34 @@ public class BlurPanel extends FrameLayout implements ViewTreeObserver.OnPreDraw
         RecordingCanvas fc = frostNode.beginRecording(cw, ch);
         fc.drawRenderNode(captureNode);
         frostNode.endRecording();
-        frostNode.setRenderEffect(RenderEffect.createBlurEffect(
-                Math.max(0.5f, radiusPx * scale), Math.max(0.5f, radiusPx * scale),
-                Shader.TileMode.CLAMP));
+        float fr = Math.max(0.5f, radiusPx * scale);
+        if (cachedFrostEffect == null || fr != cachedFrostRadius) {
+            cachedFrostEffect = RenderEffect.createBlurEffect(fr, fr, Shader.TileMode.CLAMP);
+            cachedFrostRadius = fr;
+        }
+        frostNode.setRenderEffect(cachedFrostEffect);
 
         rimNode.setPosition(0, 0, cw, ch);
         RecordingCanvas rc = rimNode.beginRecording(cw, ch);
         rc.drawRenderNode(captureNode);
         rimNode.endRecording();
-        RenderEffect glass = Glass.rimEffect(pw, ph, sBleed,
+        if (glass == null) glass = new Glass();
+        RenderEffect glassEffect = ((Glass) glass).rimEffect(pw, ph, sBleed,
                 cornerPx * scale, bandPx * scale, thicknessPx * scale, ior,
-                specular, rim, tint);
+                specular, rim, tint, lineWidthPx * scale);
         // The rim gets its OWN blur, separate from the interior frost. At 0 it refracts a
         // sharp image; wound up, the bevel frosts too, which is what real frosted glass
         // does. Blurring the whole capture instead -- one node for both -- is what made the
         // early version look like a smudge, so keep these independent.
         float edge = (edgeBlurPx < 0f ? radiusPx * 0.35f : edgeBlurPx) * scale;
-        rimNode.setRenderEffect(edge <= 0.5f ? glass
-                : RenderEffect.createChainEffect(glass,
-                        RenderEffect.createBlurEffect(edge, edge, Shader.TileMode.CLAMP)));
+        if (cachedRimChain == null || edge != cachedEdge || glassEffect != cachedRimBase) {
+            cachedRimChain = edge <= 0.5f ? glassEffect
+                    : RenderEffect.createChainEffect(glassEffect,
+                            RenderEffect.createBlurEffect(edge, edge, Shader.TileMode.CLAMP));
+            cachedEdge = edge;
+            cachedRimBase = glassEffect;
+        }
+        rimNode.setRenderEffect(cachedRimChain);
 
         for (RenderNode n : new RenderNode[] { frostNode, rimNode }) {
             n.setPivotX(0f);

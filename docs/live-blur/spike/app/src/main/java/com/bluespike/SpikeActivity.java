@@ -63,6 +63,13 @@ public class SpikeActivity extends Activity {
         list.setAdapter(new TileAdapter());
         list.setHasFixedSize(true);
         blurTarget.addView(list, match());
+        // Horizontal bands run parallel to a horizontal rim and perpendicular to a vertical
+        // one, so neither shows the compression -- the sample slides ALONG the boundary.
+        // Diagonals cross every edge at an angle, which is why the iOS reference shots use
+        // them. --ez diag true overlays a few.
+        if (getIntent().getBooleanExtra("diag", false)) {
+            blurTarget.addView(new DiagonalOverlay(this), match());
+        }
         root.addView(blurTarget, match());
 
         panel = new BlurPanel(this);
@@ -136,6 +143,7 @@ public class SpikeActivity extends Activity {
                 dp(getIntent().getFloatExtra("bleed", 120f)));
         panel.setElevation(dp(getIntent().getFloatExtra("elevation", 10f)));
         panel.setTintColor((int) getIntent().getLongExtra("tintColor", 0L));
+        panel.setLineWidth(dp(getIntent().getFloatExtra("lineWidth", 1.8f)));
         panel.setEdgeBlur(getIntent().hasExtra("edgeBlur")
                 ? dp(getIntent().getFloatExtra("edgeBlur", 0f)) : -1f);
         panel.setFlatness(getIntent().getFloatExtra("flatness", -1f),
@@ -245,6 +253,27 @@ public class SpikeActivity extends Activity {
 
         @Override
         public int getItemCount() { return 5000; }
+    }
+
+    /** Thick diagonal bands, so the rim has something to bend. */
+    private static class DiagonalOverlay extends View {
+        private final android.graphics.Paint paint = new android.graphics.Paint();
+        DiagonalOverlay(android.content.Context c) {
+            super(c);
+            paint.setAntiAlias(true);
+            paint.setColor(0xE6101018);
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+        }
+        @Override protected void onDraw(android.graphics.Canvas canvas) {
+            int w = getWidth(), h = getHeight();
+            canvas.save();
+            canvas.rotate(28f, w * 0.5f, h * 0.5f);
+            float bw = w * 0.16f;
+            for (float x = -w; x < w * 2f; x += bw * 2.6f) {
+                canvas.drawRect(x, -h, x + bw, h * 2f, paint);
+            }
+            canvas.restore();
+        }
     }
 
     private static class TileVH extends RecyclerView.ViewHolder {

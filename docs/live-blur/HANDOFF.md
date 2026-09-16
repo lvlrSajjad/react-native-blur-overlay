@@ -13,7 +13,7 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
 | 3 — Fallbacks, props, docs | blocked on 1 | |
 | 4 — SDK 37.2 fast path | optional, any time after 1 | |
 | 5 — Release 3.1.0 | blocked on 1–3 | |
-| 6 — Glass edge refraction | sketched, not scheduled | prototyped 2026-09-16 and it works; cost unmeasured. Not in 3.1.0. Phase 1 only owes it an outset-capable capture rect. |
+| 6 — Glass edge refraction | sketched, not scheduled | prototyped **and measured** 2026-09-16: works, and affordable at inputScale 0.5 (collapses at 1.0 — 100% jank at 90Hz). Not in 3.1.0. Phase 1 only owes it an outset-capable capture rect. |
 
 ## Still owed after Phase 0
 
@@ -242,10 +242,11 @@ docs/live-blur/spike, so start by running it rather than from scratch.
 
 Do not start this before Phase 3: it needs the setBackground() fix for the corner radius.
 
-First job is the one thing the prototype never did — measure it on an API 33 device, both
-with and against blurMode="live", and record it in RESULTS.md. It is 3 RenderNodes, an
-enlarged capture and 5 dependent texture reads per rim pixel, so it may simply be too
-expensive. If it is, say so and stop.
+The API 33 measurement is already done and in RESULTS.md — glass holds 90fps at inputScale
+0.5 and collapses completely at 1.0, so clamp the scale rather than trusting a caller. Read
+the three corrections at the end of that section before touching the shader; two of them are
+bugs that looked like aesthetic choices, and the third is why the test backdrop needs
+--ez diag true.
 ```
 
 ### Phase 5
