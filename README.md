@@ -301,6 +301,12 @@ npm run example:android   # or: npm run example:ios
 It is an npm workspace of the library and Metro resolves the library to its
 TypeScript sources, so editing `src/` refreshes the app without a rebuild.
 
+## Roadmap
+
+Android's blur is a snapshot; iOS's is live. Making Android live is planned for 3.1.0 —
+the constraints, the research behind it and the phased plan are in
+[docs/live-blur/PLAN.md](docs/live-blur/PLAN.md).
+
 ## Contributing
 
 ```bash
