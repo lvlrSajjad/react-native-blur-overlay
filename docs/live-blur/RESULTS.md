@@ -168,3 +168,97 @@ of one. Emulator frame numbers from this phase should not be quoted anywhere.
 - `Build.VERSION.SDK_INT_FULL` is not resolvable by name on API 30 (the harness reads it
   reflectively and prints `n/a`). Phase 4's gate needs an API-level guard around the field
   access, not just a value comparison.
+
+## Phase 0 (continued) — the device measurement Phase 0 owed — 2026-09-16
+
+Same harness and same method as the section above. This closes the gap that section left
+open: an API 31+ physical device, at two refresh rates.
+
+Device: Samsung Galaxy A22 (SM-A225F), Android 13 / API 33, MediaTek Helio G80
+(MT6769V/CT) with a Mali-G52 MC2, 720×1600, 60Hz and 90Hz, release build. This is
+low-end 2021 hardware, which makes it a harder test than a flagship and a fairer one for
+the "mid-range" wording in the exit criteria. Refresh rate pinned per run with
+`settings put system min_refresh_rate` / `peak_refresh_rate`, confirmed against
+SurfaceFlinger's active mode, and restored afterwards. Still frame from this device:
+[`variantB-device.png`](./spike/evidence/variantB-device.png) — sharp panel content over a
+blurred backdrop, same as the emulator.
+
+### 60Hz — the exit criterion, met
+
+Budget 16.6ms. P90 and jank are medians of 3 interleaved repetitions.
+
+| Variant | inputScale | P90 frame (ms) | Janky frames | Re-record cost, median / P90 |
+| --- | --- | --- | --- | --- |
+| off — baseline | — | 11 | ≤0.16% | — |
+| Bc — capture only | 0.5 | 14 | ≤0.16% | 0.19 / 0.43 ms |
+| B — capture + blur | 1.0 | 15 | **0.00%** | 0.19 / 0.40 ms |
+| B — capture + blur | 0.5 | 15 | **0.00%** | 0.20 / 0.43 ms |
+| B — capture + blur | 0.25 | 16 | ≤0.16% | 0.21 / 0.44 ms |
+
+**Variant B at inputScale 0.5 holds 15ms P90 with zero janky frames at 60Hz.** That is the
+Phase 0 exit criterion, met on hardware that can run the feature. Scroll held 60.0–60.1fps
+throughout. Every inputScale fits the budget at 60Hz, including 1.0.
+
+### 90Hz — passes, and downscale starts to matter
+
+Budget 11.1ms. Medians of 3 interleaved repetitions, excluding the environmental outliers
+discussed below.
+
+| Variant | inputScale | P90 frame (ms) | Janky frames | Re-record cost, median / P90 |
+| --- | --- | --- | --- | --- |
+| off — baseline | — | 13 | 0.00% | — |
+| Bc — capture only | 0.5 | 13 | ≤0.22% | 0.18 / 0.43 ms |
+| B — capture + blur | 1.0 | 15 | ≤0.22% | 0.19 / 0.40 ms |
+| B — capture + blur | 0.5 | 13 | ≤0.22% | 0.18 / 0.39 ms |
+| B — capture + blur | 0.25 | 13 | ≤0.11% | 0.18 / 0.38 ms |
+
+Scroll held 90.0–90.5fps throughout. Note the baseline itself reports 13ms P90 at 90Hz
+while janking 0.00%, so P90 total frame duration overshoots the 11.1ms vsync interval even
+with the app doing nothing; at this refresh rate the jank percentage is the meaningful
+signal and it stays at or below 0.22% for every variant.
+
+### The blur's cost, finally separated
+
+The emulator could not resolve `B` from `Bc`. This device can:
+
+- **inputScale 1.0 costs about 2ms** — B@1.0 sits at 15ms P90 against 13ms for capture-only
+  at both refresh rates. Affordable at 60Hz, and the largest single item in the budget at
+  90Hz.
+- **inputScale 0.5 and 0.25 cost under 1ms** — indistinguishable from capture-only at
+  90Hz, and within a millisecond of it at 60Hz.
+
+So downscaling is worth roughly 2ms of `RenderEffect` time on a Mali-G52 at 720p, and
+buys it back almost entirely at 0.5. **This confirms the plan's intent to default live blur
+to `downsampling` 2.** Going further to 0.25 bought nothing on this device and was
+marginally *worse* at 60Hz (16ms vs 15ms), so 0.25 should not be the default.
+
+The re-record cost is 0.17–0.21ms median / 0.37–0.46ms P90 — statistically the same as the
+A70's, across a different SoC, a different GPU vendor, a different Android version and a
+different screen resolution. The per-frame subtree re-record looks genuinely cheap and
+genuinely portable.
+
+### About the jank outliers
+
+Three runs out of 40 on this device reported 69–99% janky frames with p50 inflated to
+14–23ms. They are environmental, not a property of the blur, and the evidence is direct:
+**one of them was the `off` baseline** — no capture, no blur, no `RenderNode` — at 99.23%
+jank and 23ms p50. Counting every 90Hz run, the outlier rate was 2 of 13 for B@0.5 and 1 of
+6 for the capture-free baseline. Indistinguishable.
+
+This is a real person's daily phone with real apps installed and notifications arriving, so
+occasional interference is expected. Recorded here so a future session does not mistake a
+repeat for a regression. It is also a reminder that a single 12s run on a shared device is
+not evidence; the interleaved baseline is what made these dismissible.
+
+### Phase 0 status after this section
+
+The performance half is no longer provisional. Both the structural verdict and the frame
+budget are now measured:
+
+- **Variant B at inputScale 0.5 meets the ≤16.6ms P90 / low-jank bar at 60Hz on low-end
+  2021 hardware**, and holds at 90Hz too.
+- **`<BlurTarget>` is confirmed as the Phase 1 API** — unchanged, and unchangeable, from the
+  structural finding above.
+- Still untested: **120Hz** (no 120Hz panel was available; 90Hz is the highest measured)
+  and **what an RN Fabric hierarchy adds** over plain Views. Phase 1 still owes the Fabric
+  number, measured in the example app rather than this harness.

@@ -1,8 +1,8 @@
 # Phase 0 spike harness
 
-Throwaway, but kept: Phase 0's verdict was recorded on an emulator and one API 30 device,
-so the numbers still need re-running on API 31+ hardware. Deleting the harness would make
-that impossible to do on the same footing.
+Throwaway, but kept: this harness produced Phase 0's verdict, and Phase 1 still owes a
+120Hz run and a comparison against React Native's own hierarchy. Deleting it would make
+those impossible to do on the same footing.
 
 No React Native and no library code — plain Views, so nothing here can be confused for a
 change to the shipped library. It is under `docs/`, which `package.json`'s `files`
@@ -42,6 +42,16 @@ adb shell am start -n com.bluespike/.SpikeActivity \
 
 # the sweep used for RESULTS.md: <device> <output file> then variant:scale pairs
 ./sweep.sh emulator-5554 out.txt off:1.0 B:1.0 B:0.5 B:0.25
+```
+
+To pin the refresh rate (the Phase 0 device runs did this, and restored it afterwards):
+
+```bash
+adb shell settings put system min_refresh_rate 60.0
+adb shell settings put system peak_refresh_rate 60.0
+# ... run ...
+adb shell settings delete system min_refresh_rate
+adb shell settings delete system peak_refresh_rate
 ```
 
 `sweep.sh` interleaves the baseline with the variants on every repetition, because host-side
