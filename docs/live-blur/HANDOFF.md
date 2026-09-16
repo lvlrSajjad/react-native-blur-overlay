@@ -34,8 +34,16 @@ Hardware available to this project, none of it permanently attached — ask befo
 | Device | API | Refresh | Use |
 | --- | --- | --- | --- |
 | Galaxy A70 (SM-A705FN), the owner's | 30 | 60Hz | **cannot run live blur** — below the API 31 floor `RenderEffect` needs. Snapshot and capture-only paths only. |
-| Galaxy A22 (SM-A225F), **borrowed from a family member** | 33 | 60 / 90Hz | the device Phase 0's numbers come from. Ask first, and leave it as found: uninstall test APKs, restore refresh-rate settings, offer to turn developer options back off. |
+| Galaxy A22 (SM-A225F), **borrowed from a family member** | 33 | 60 / 90Hz | the device Phases 0 and 1 measured on. Ask first, and leave it as found: uninstall test APKs, restore refresh-rate settings, offer to turn developer options back off. |
 | Small_Phone / Mo_Device / Medium_Tablet AVDs | 36 | 60Hz | functional checks only |
+
+**Cross-window blur is off on both physical phones and on only the emulator.** Checked
+2026-09-17: the A22 has `ro.surface_flinger.supports_background_blur` unset and
+SurfaceFlinger names no blur algorithm, so `isCrossWindowBlurEnabled()` returns false
+there; the API 36 emulator has the property set to 1 and reports `KawaseDualFilterV2`.
+Phase 2 therefore sees its happy path only on the emulator — acceptable, because window
+blur is system-side and Phase 2 needs no frame numbers — and gets to test its degradation
+path on hardware that genuinely lacks the feature rather than on a simulated switch.
 
 **Emulator frame timings on this machine are not usable as measurements.** The baseline
 alone drifts 18–31ms P90 with host load, which swamps the sub-millisecond effects this work
@@ -216,7 +224,12 @@ RESULTS.md and HANDOFF.md first.
 Detect that the overlay is hosted in a Dialog window (as RN <Modal> does) and use
 Window.setBackgroundBlurRadius there, gated on WindowManager.isCrossWindowBlurEnabled(),
 with a translucent window background and a graceful fallback when cross-window blur is
-off. Add a Modal demo to the example app and verify live blur behind it on a device.
+off. Add a Modal demo to the example app.
+
+Verify both halves, and note where: the Galaxy A22 does NOT support cross-window blur, so
+it tests the fallback for real, and the happy path is only visible on the API 36 emulator.
+That is fine here — window blur is system-side, so this phase needs no frame numbers — but
+do not let the emulator tempt you into quoting timings from it.
 ```
 
 ### Phase 3
