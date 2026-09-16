@@ -408,3 +408,144 @@ construction is compilation, and it must be hoisted out of the frame loop.
 Feasible and affordable at inputScale 0.5, on the weakest hardware available. Still a
 Phase 6 sketch, still not in 3.1.0, and the remaining gap to iOS is the compression ratio
 and the aliasing under extreme squeeze — UI iteration, not a technical unknown.
+
+## Phase 1 — live blur inside a React Native hierarchy — 2026-09-17
+
+The number Phase 0 owed and could not produce: **what Fabric adds over plain Views.**
+Everything below is the shipped library in the example app, not a harness.
+
+Device: Samsung Galaxy A22 (SM-A225F), Android 13 / API 33, Helio G80 / Mali-G52 MC2,
+720×1600 @ 300dpi, release build (`assembleRelease`, Hermes, New Architecture / Fabric,
+debug-signed). Refresh pinned per run with `settings put system min_refresh_rate` /
+`peak_refresh_rate`, restored afterwards.
+
+Method: [`example-sweep.sh`](./example-sweep.sh). The example app's tile list is a
+`FlatList` of 400 cells inside `<BlurTarget>`; the frosted panel is a sibling overlay
+across the bottom quarter, 720×380px. Each run force-stops the app, relaunches it with
+the variant chosen by launch-intent extras, settles 5s, resets `gfxinfo`, then drives ten
+alternating 900ms drags of 800px clear of the panel — about 10s of continuous scrolling —
+and reads `dumpsys gfxinfo`. The baseline re-runs immediately before every variant on
+every repetition. 3 repetitions; tables give the median with the range across
+repetitions. Raw rows: [`evidence/phase1-60hz.tsv`](./evidence/phase1-60hz.tsv),
+[`evidence/phase1-90hz.tsv`](./evidence/phase1-90hz.tsv).
+
+### It works, and the check is numeric rather than visual
+
+The panel tracks the list as it scrolls:
+[`evidence/live-panel.png`](./evidence/live-panel.png). Phase 0 established that this
+failure mode is invisible, so it was checked by measurement instead of by eye — two
+screenshots at two scroll positions differ by a mean of **93/255 per channel** across the
+panel, so the backdrop really is being re-blurred rather than held.
+
+The library's own counter (`adb shell setprop log.tag.BlurOverlay DEBUG`) reported
+**109 captures over 120 drawn frames** with the cadence cap off. So in a Fabric hierarchy
+the `<BlurTarget>`'s own display list is rebuilt on about 91% of scrolled frames: the
+change gate is nearly a no-op during a scroll, and total on a still screen, where no frame
+is drawn and the pre-draw listener never runs at all.
+
+### 60Hz — the default configuration costs about one millisecond
+
+Budget 16.6ms. Medians of 3; the baseline row is 18 interleaved runs.
+
+| Variant | downsampling | maxUpdateFps | p50 | P90 | Janky frames |
+| --- | --- | --- | --- | --- | --- |
+| off — baseline | — | — | 9ms | 13ms | 0.17% |
+| snapshot — today's default | 2 | — | 11ms | 14ms | 0.17% |
+| **live — the shipped default** | **2** | **30** | **12ms** | **14ms** | **0.52%** |
+| live | 2 | uncapped | 12ms | 15ms | 0.17% |
+| live | 1 | 30 | 22ms | 25ms | 6.53% |
+| live | 1 | uncapped | 22ms | 25ms | 4.15% |
+
+**Live blur at its defaults is indistinguishable from the snapshot it replaces** — 14ms
+P90 for both, about 1ms over a no-overlay baseline, with jank at half a percent. That is
+the Phase 1 exit criterion met inside Fabric.
+
+**What Fabric costs, against Phase 0's plain-View spike on this same phone:** the baseline
+rises from 11ms to 13ms P90 and live blur from 15ms to 14ms — i.e. the hierarchy costs a
+couple of milliseconds of baseline, and the blur's *marginal* cost does not change. The
+per-frame capture is as cheap in React Native as it was in plain Views.
+
+### 90Hz — the same defaults hold, and the cadence cap earns its keep
+
+Budget 11.1ms. As Phase 0 recorded, the baseline itself overshoots that at this refresh
+rate while janking almost nothing, so the jank percentage is the signal that matches what
+the scroll actually did.
+
+| Variant | downsampling | maxUpdateFps | p50 | P90 | Janky frames |
+| --- | --- | --- | --- | --- | --- |
+| off — baseline | — | — | 8ms | 11ms | 0.23% |
+| snapshot | 2 | — | 10ms | 12ms | 0.34% |
+| **live — the shipped default** | **2** | **30** | **11ms** | **14ms** | **1.50%** |
+| live | 1 | 30 | 12ms | 15ms | 1.50% |
+| live | 2 | uncapped | 15ms | 17ms | **31.29%** (1.16 / 31.29 / 56.24) |
+| live | 1 | uncapped | 12ms | 15ms | 0.81% |
+
+**Uncapped capture is the one configuration that fails.** At half resolution and 90Hz it
+janked 31% and 56% of frames in two of three repetitions, against 1.50% for the same
+configuration capped at 30fps. At 60Hz the same uncapped variant was fine (0.17%). So the
+cap costs nothing where it is not needed and prevents a collapse where it is — it stays on
+by default at 30.
+
+### Two anomalies, recorded rather than explained
+
+Both are consistent enough not to be dismissed and neither has an explanation that this
+session could test. They do not change the decision — the shipped configuration is the
+best one at both refresh rates — but a later phase should not be surprised by them.
+
+1. **Full resolution is ruinous at 60Hz and fine at 90Hz.** `downsampling` 1 measured
+   25ms P90 / ~6% jank at 60Hz, in three repetitions out of three, p50 22/22/23 — and
+   15ms P90 / ~1.5% at 90Hz, also three out of three, p50 12/12/12. The same work cannot
+   genuinely cost 10ms more on a slower-refreshing display. The likeliest cause is GPU
+   DVFS: this Mali-G52 probably clocks lower in the 60Hz display mode, so the expensive
+   full-resolution blur is absorbed at 90Hz and not at 60Hz. Untested.
+2. **The uncapped/half-resolution failure at 90Hz does not reproduce at full
+   resolution**, which is backwards if the cost were simply the blur.
+
+Both variants sit at fixed positions in the run order, which is the obvious confound and
+the cheapest thing to rule out: a future sweep should randomise variant order within a
+repetition. Note that the interleaved baselines next to both anomalies were clean
+(13ms/0.17% at 60Hz, 11ms/0.23% at 90Hz), so this is not the environmental jank Phase 0
+documented.
+
+### Decisions
+
+- **`downsampling` defaults to 2 for live blur and 1 for snapshot.** Phase 0 measured the
+  downscale as worth ~2ms on a 400dp panel; on a full-width panel in an RN app it is worth
+  11ms at 60Hz. The plan's intent is confirmed, and more strongly than the spike implied.
+- **`maxUpdateFps` defaults to 30.** It is free at 60Hz and prevents a 31–56% jank
+  collapse at 90Hz.
+- **The change gate stays**, but for what it does on a still screen rather than during a
+  scroll: a Fabric `<BlurTarget>` redraws on ~91% of scrolled frames, so it saves almost
+  nothing there. The real saving is that a pre-draw listener never fires when nothing draws.
+- **Phase 1's exit criteria are met on device**, at both available refresh rates.
+
+### Two things found by reading the code, not by measuring it
+
+Recorded because both are the silent-failure class Phase 0 warned about, and neither would
+have shown up in the sweep — the example app always has a valid target.
+
+- **The fallback did not fall back.** `scheduleBlur()` and `captureAndBlur()` both bailed
+  out while live mode was running, so an overlay with `blurMode="live"` and no
+  `<BlurTarget>` in its window suppressed the snapshot *and* had nothing live to draw: a
+  transparent overlay. Fixed by gating the snapshot on whether live blur actually owns the
+  backdrop rather than on whether it is enabled, and verified on device with a deliberately
+  wrong `blurTargetId`:
+  [`evidence/live-no-target-fallback.png`](./evidence/live-no-target-fallback.png) shows
+  the snapshot blur, and exactly one warning in logcat.
+- **An ancestor target is refused in code.** Phase 0 proved a capture containing the
+  overlay cannot work; `resolveTarget()` now walks the overlay's parents and rejects a
+  target it finds among them, with a warning, rather than leaving HWUI to blank the panel
+  with nothing in the logs.
+
+### Still open after Phase 1
+
+- **120Hz.** Unchanged from Phase 0: no 120Hz panel has run any of this.
+- **The split between re-record and blur inside Fabric.** Phase 0 separated them with a
+  capture-only variant in the spike; the library has no such mode, so the sweep measures
+  them together. Phase 4 needs the split to judge `setBackdropRenderEffect` honestly.
+- **`borderRadius` on the Android overlay.** Live blur no longer goes through
+  `setBackground()`, so half the obstacle is gone, but the blur is drawn in `onDraw()`
+  without clipping to RN's outline, so corners are still square. Left to Phase 3 as the
+  plan allows.
+- **Whether a 30fps cap is visually acceptable** — measured as cheap, not judged by eye.
+  The bound is one cap interval, so up to 33ms of staleness in the backdrop.

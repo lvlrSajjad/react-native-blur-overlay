@@ -64,6 +64,30 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<SajjadBlurOverlay
   }
 
   @Override
+  @ReactProp(name = "blurMode")
+  public void setBlurMode(SajjadBlurOverlayView view, @Nullable String value) {
+    view.setBlurMode(value);
+  }
+
+  @Override
+  @ReactProp(name = "blurTargetId")
+  public void setBlurTargetId(SajjadBlurOverlayView view, @Nullable String value) {
+    view.setBlurTargetId(value);
+  }
+
+  @Override
+  @ReactProp(name = "maxUpdateFps", defaultInt = 30)
+  public void setMaxUpdateFps(SajjadBlurOverlayView view, int value) {
+    view.setMaxUpdateFps(value);
+  }
+
+  @Override
+  @ReactProp(name = "captureOutset", defaultFloat = 0f)
+  public void setCaptureOutset(SajjadBlurOverlayView view, float value) {
+    view.setCaptureOutset(value);
+  }
+
+  @Override
   @ReactProp(name = "blurStyle")
   public void setBlurStyle(SajjadBlurOverlayView view, @Nullable String value) {
     // iOS only: Android renders a blurred snapshot rather than a UIBlurEffect.

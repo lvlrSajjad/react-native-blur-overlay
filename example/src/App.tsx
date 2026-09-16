@@ -1,8 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
+  FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
@@ -10,8 +10,10 @@ import {
   View,
 } from 'react-native';
 import BlurOverlay, {
+  BlurTarget,
   closeOverlay,
   openOverlay,
+  type BlurMode,
   type BlurOverlayInstance,
   type BlurStyle,
 } from 'react-native-blur-overlay';
@@ -24,7 +26,7 @@ const BLUR_STYLES: BlurStyle[] = [
   'systemChromeMaterial',
 ];
 
-const TILES = [
+const PALETTE = [
   '#ef476f',
   '#ffd166',
   '#06d6a0',
@@ -36,12 +38,45 @@ const TILES = [
   '#02c39a',
 ];
 
-export default function App() {
+// Long enough to keep a scroll going, which is the point: a live blur is only
+// interesting while something is moving behind it.
+const TILES = Array.from({ length: 400 }, (_, index) => `tile-${index}`);
+
+const UPDATE_RATES = [30, 60, 0];
+
+/**
+ * Initial props, which on Android come from the launch intent's extras — see
+ * `MainActivity`. They only pick the demo's starting state; every one of them is
+ * still a button below.
+ */
+interface LaunchProps {
+  blurMode?: BlurMode;
+  maxUpdateFps?: number;
+  downsampling?: number;
+  panel?: boolean;
+  /**
+   * Point the panel at a `<BlurTarget>` that does not exist, to see what a live
+   * overlay does when it cannot find one. It should fall back to a snapshot.
+   */
+  blurTargetId?: string;
+}
+
+export default function App({
+  blurMode: initialBlurMode,
+  maxUpdateFps: initialMaxUpdateFps,
+  downsampling: initialDownsampling,
+  panel,
+  blurTargetId,
+}: LaunchProps) {
   const [blurStyle, setBlurStyle] = useState<BlurStyle>('dark');
   const [radius, setRadius] = useState(14);
-  const [downsampling, setDownsampling] = useState(2);
+  const [downsampling, setDownsampling] = useState(initialDownsampling ?? 2);
   const [alwaysOn, setAlwaysOn] = useState(false);
-  const [glass, setGlass] = useState(false);
+  const [glass, setGlass] = useState(panel ?? false);
+  const [blurMode, setBlurMode] = useState<BlurMode>(
+    initialBlurMode ?? 'snapshot'
+  );
+  const [maxUpdateFps, setMaxUpdateFps] = useState(initialMaxUpdateFps ?? 30);
 
   const menu = useRef<BlurOverlayInstance>(null);
 
@@ -49,22 +84,37 @@ export default function App() {
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" />
 
-      {/* Something worth blurring. */}
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>react-native-blur-overlay</Text>
-        <Text style={styles.subtitle}>
-          The overlay blurs whatever is rendered behind it. Scroll, then open
-          one of the overlays below.
-        </Text>
-
-        <View style={styles.grid}>
-          {TILES.map((color) => (
-            <View key={color} style={[styles.tile, { backgroundColor: color }]}>
-              <Text style={styles.tileLabel}>{color}</Text>
+      {/* Something worth blurring — and, for `blurMode="live"`, the subtree the
+          overlay captures. Note that every overlay below is a *sibling* of this,
+          never a child: an overlay cannot blur a subtree it is part of. */}
+      <BlurTarget style={styles.target}>
+        <FlatList
+          data={TILES}
+          numColumns={4}
+          keyExtractor={(tile) => tile}
+          contentContainerStyle={styles.content}
+          columnWrapperStyle={styles.gridRow}
+          renderItem={({ index }) => (
+            <View
+              style={[
+                styles.tile,
+                { backgroundColor: PALETTE[index % PALETTE.length] },
+              ]}
+            >
+              <Text style={styles.tileLabel}>{index}</Text>
             </View>
-          ))}
-        </View>
-
+          )}
+          ListHeaderComponent={
+            <View style={styles.header}>
+              <Text style={styles.title}>react-native-blur-overlay</Text>
+              <Text style={styles.subtitle}>
+                The overlay blurs whatever is rendered behind it. Scroll, then
+                open one of the overlays below.
+              </Text>
+            </View>
+          }
+          ListFooterComponent={
+            <View style={styles.footer}>
         <Section title="Open it">
           <Button label="openOverlay()" onPress={() => openOverlay()} />
           <Button label="ref.open()" onPress={() => menu.current?.open()} />
@@ -111,9 +161,34 @@ export default function App() {
                 setDownsampling((value) => (value >= 4 ? 1 : value + 1))
               }
             />
+            <Button
+              label={`blurMode ${blurMode}`}
+              selected={blurMode === 'live'}
+              onPress={() =>
+                setBlurMode((value) => (value === 'live' ? 'snapshot' : 'live'))
+              }
+            />
+            <Button
+              label={
+                maxUpdateFps === 0
+                  ? 'maxUpdateFps every frame'
+                  : `maxUpdateFps ${maxUpdateFps}`
+              }
+              onPress={() =>
+                setMaxUpdateFps(
+                  (value: number) =>
+                    UPDATE_RATES[
+                      (UPDATE_RATES.indexOf(value) + 1) % UPDATE_RATES.length
+                    ] ?? 30
+                )
+              }
+            />
           </Section>
         )}
-      </ScrollView>
+            </View>
+          }
+        />
+      </BlurTarget>
 
       {/* 1. Driven imperatively, by id or through the ref. */}
       <BlurOverlay
@@ -156,8 +231,14 @@ export default function App() {
         <BlurOverlay
           visible={glass}
           blurStyle="systemThinMaterial"
+          blurMode={blurMode}
+          blurTargetId={blurTargetId}
+          maxUpdateFps={maxUpdateFps}
           radius={20}
-          downsampling={2}
+          downsampling={downsampling}
+          // Gives the blur real pixels to sample past the panel's edge instead
+          // of clamping the last row.
+          captureOutset={20}
           brightness={-16}
           fadeDuration={220}
         >
@@ -175,6 +256,8 @@ export default function App() {
       <BlurOverlay
         visible={alwaysOn}
         blurStyle={blurStyle}
+        blurMode={blurMode}
+        maxUpdateFps={maxUpdateFps}
         radius={radius}
         downsampling={downsampling}
         brightness={-60}
@@ -234,19 +317,22 @@ function Button({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0b1020' },
+  target: { flex: 1 },
   content: {
     padding: 20,
     // The app runs edge to edge, so keep the header clear of the status bar.
     paddingTop: (StatusBar.currentHeight ?? 44) + 20,
     paddingBottom: 48,
-    gap: 16,
+    gap: 8,
   },
   title: { color: 'white', fontSize: 24, fontWeight: '700' },
   subtitle: { color: '#9fb3c8', fontSize: 14, lineHeight: 20 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  header: { gap: 16, paddingBottom: 16 },
+  footer: { gap: 16, paddingTop: 16 },
+  gridRow: { gap: 8 },
   tile: {
-    width: 96,
-    height: 72,
+    flex: 1,
+    height: 64,
     borderRadius: 10,
     padding: 8,
     justifyContent: 'flex-end',

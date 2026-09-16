@@ -16,6 +16,26 @@ export interface NativeProps extends ViewProps {
    */
   brightness?: CodegenTypes.WithDefault<CodegenTypes.Float, 0>;
   /**
+   * `"snapshot"` blurs once, when the overlay appears. `"live"` re-blurs a
+   * `<BlurTarget>` every frame, and needs API 31+ — below that, and when no
+   * target is found, it falls back to `"snapshot"`. Android only.
+   */
+  blurMode?: CodegenTypes.WithDefault<string, 'snapshot'>;
+  /**
+   * Which `<BlurTarget>` a live overlay captures. Android only.
+   */
+  blurTargetId?: CodegenTypes.WithDefault<string, 'default'>;
+  /**
+   * Upper bound on live re-blurs per second. `0` re-blurs on every frame the
+   * screen draws. Android only.
+   */
+  maxUpdateFps?: CodegenTypes.WithDefault<CodegenTypes.Int32, 30>;
+  /**
+   * How far past the overlay's own bounds the capture reaches, in
+   * (pre-downsampling) pixels. Negative values inset it. Android only.
+   */
+  captureOutset?: CodegenTypes.WithDefault<CodegenTypes.Float, 0>;
+  /**
    * `UIBlurEffectStyle` to use. iOS only.
    */
   blurStyle?: CodegenTypes.WithDefault<string, 'light'>;

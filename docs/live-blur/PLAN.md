@@ -1,8 +1,9 @@
 # Live backdrop blur on Android — plan
 
-**Status:** Phase 0 **passed** — variant A failed, Phase 1 ships a `<BlurTarget>`; budget
-measured on device (15ms P90, 0% jank at 60Hz, Galaxy A22) · **Target release:** 3.1.0
-(additive, opt-in) · **Last updated:** 2026-09-16
+**Status:** Phase 1 **passed** — `blurMode="live"` ships with a `<BlurTarget>`, measured in
+the example app on a Galaxy A22: 14ms P90 / 0.5% jank at 60Hz and 1.5% at 90Hz, level with
+the snapshot it replaces · **Target release:** 3.1.0 (additive, opt-in) ·
+**Last updated:** 2026-09-17
 
 ## The problem
 
@@ -55,7 +56,9 @@ cross-checked against the Android docs:
 
 **Unmeasured anywhere public:** the per-frame cost of this approach inside a React
 Native Fabric hierarchy. Every number above comes from Compose (Haze) or the Flutter
-engine. That gap is what Phase 0 exists to close.
+engine. That gap is what Phase 0 exists to close. **Closed in Phase 1:** Fabric costs a
+couple of milliseconds of baseline and nothing on the blur's marginal cost — see
+[RESULTS.md](./RESULTS.md).
 
 ## The open question that decides our API
 
@@ -255,8 +258,13 @@ iOS-breaking bugs that compile checks did not catch.
 
 - Does self-exclusion survive hardware display-list capture? (Phase 0)
 - What does an RN Fabric hierarchy add to the per-frame cost over plain Views? (Phase 0)
-- Is the cadence cap visually acceptable at 30fps? At 20? (Phase 1)
-- Can the blur be drawn without `setBackground()`, restoring `borderRadius` support on
-  Android? (Phase 1 or 3)
+- Is the cadence cap visually acceptable at 30fps? At 20? (Phase 1 measured it as free at
+  60Hz and necessary at 90Hz, but did not judge it by eye; the bound is one cap interval,
+  so up to 33ms of staleness.)
+- ~~Can the blur be drawn without `setBackground()`~~ — half answered in Phase 1: the live
+  path draws in `onDraw()` and never touches `setBackground()`, but it does not clip to
+  RN's outline, so `borderRadius` on the overlay is still square. Phase 3.
+- Why is full-resolution live blur ruinous at 60Hz and fine at 90Hz on the A22? GPU DVFS
+  is the hypothesis; nothing tested it. (RESULTS.md, Phase 1 anomalies.)
 - ~~What does the glass edge cost on a real API 33 GPU?~~ Measured 2026-09-16: fine at
   inputScale 0.5, collapses at 1.0 on a Mali-G52 at 90Hz.

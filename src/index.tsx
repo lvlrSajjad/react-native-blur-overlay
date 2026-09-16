@@ -9,14 +9,17 @@ import {
 } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   View,
   type StyleProp,
+  type ViewProps,
   type ViewStyle,
 } from 'react-native';
 
 import NativeBlurOverlay from './SajjadBlurOverlayNativeComponent';
+import NativeBlurTarget from './SajjadBlurTargetNativeComponent';
 import { emit, off, on } from './emitter';
 
 /**
@@ -40,6 +43,57 @@ export type BlurStyle =
   | 'systemMaterial'
   | 'systemThickMaterial'
   | 'systemChromeMaterial';
+
+/**
+ * How the Android blur is produced. iOS is always live, whatever this says.
+ *
+ * - `snapshot` blurs the screen once, when the overlay appears, and leaves it
+ *   frozen. Costs nothing per frame. The default, and all 3.0 could do.
+ * - `live` re-blurs a `<BlurTarget>` as it draws, so content moving behind the
+ *   overlay stays blurred. Needs Android 12 (API 31) and a `<BlurTarget>`;
+ *   without either it falls back to `snapshot`.
+ */
+export type BlurMode = 'snapshot' | 'live';
+
+export interface BlurTargetProps extends ViewProps {
+  /**
+   * Id a live `<BlurOverlay />` finds this subtree by. Only needed when more
+   * than one target is mounted at a time.
+   *
+   * @default DEFAULT_ID
+   */
+  id?: string;
+  children?: ReactNode;
+}
+
+/**
+ * The subtree a live overlay blurs.
+ *
+ * Wrap the content that should show through the glass — a list, a screen, the
+ * whole app — and keep the overlay *outside* it:
+ *
+ * ```tsx
+ * <BlurTarget style={{ flex: 1 }}>
+ *   <ScrollView>{...}</ScrollView>
+ * </BlurTarget>
+ * <BlurOverlay blurMode="live" visible />
+ * ```
+ *
+ * An overlay cannot blur a subtree it is part of: on a hardware canvas that
+ * either blanks the overlay or drops the backdrop, with nothing in the logs.
+ * The overlay checks for it and falls back to `snapshot` rather than showing
+ * you the failure.
+ *
+ * Otherwise this is a plain `<View />` — it lays out, draws and takes touches
+ * like one, and on iOS it *is* one, since the iOS overlay is already live.
+ */
+export function BlurTarget({ id = DEFAULT_ID, ...rest }: BlurTargetProps) {
+  if (Platform.OS !== 'android') {
+    return <View {...rest} />;
+  }
+
+  return <NativeBlurTarget blurTargetId={id} {...rest} />;
+}
 
 export interface BlurOverlayProps {
   /**
@@ -79,6 +133,45 @@ export interface BlurOverlayProps {
    * @default 0
    */
   brightness?: number;
+  /**
+   * Whether the Android blur is taken once or kept up to date. Android only —
+   * the iOS overlay is a `UIVisualEffectView` and is always live.
+   *
+   * `live` needs Android 12 (API 31) and a `<BlurTarget>` around the content
+   * to blur; without either it falls back to `snapshot`.
+   *
+   * @default 'snapshot'
+   */
+  blurMode?: BlurMode;
+  /**
+   * Which `<BlurTarget>` a live overlay captures. Only needed when more than
+   * one target is mounted at a time. Android only.
+   *
+   * @default DEFAULT_ID
+   */
+  blurTargetId?: string;
+  /**
+   * Upper bound on how often a live blur is refreshed, per second. `0` refreshes
+   * on every frame the screen draws.
+   *
+   * A blur one frame behind the content is much harder to notice than a scroll
+   * that stutters, so this trades the former for the latter. Android only.
+   *
+   * @default 30
+   */
+  maxUpdateFps?: number;
+  /**
+   * How far past the overlay's own edges a live capture reaches, in the same
+   * (pre-downsampling) pixels as `radius`. Negative values pull it in.
+   *
+   * A blur clamps at the edge of what it can see, which darkens or smears the
+   * first few pixels inside the border. Giving the capture roughly a radius of
+   * bleed replaces that with real content. Costs the blur a slightly larger
+   * surface and nothing else. Android only.
+   *
+   * @default 0
+   */
+  captureOutset?: number;
   /**
    * Which `UIBlurEffectStyle` to use. iOS only.
    *
@@ -151,8 +244,12 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
       id,
       idBlur,
       radius = 20,
-      downsampling = 1,
+      downsampling,
       brightness = 0,
+      blurMode = 'snapshot',
+      blurTargetId = DEFAULT_ID,
+      maxUpdateFps = 30,
+      captureOutset = 0,
       blurStyle = 'light',
       vibrant = false,
       fadeDuration,
@@ -168,6 +265,10 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
     } = props;
 
     const overlayId = id ?? idBlur ?? DEFAULT_ID;
+    // A live blur re-runs every frame, so it starts from the downscale Phase 0
+    // measured as free on low-end hardware; a snapshot runs once and can afford
+    // full resolution.
+    const scale = downsampling ?? (blurMode === 'live' ? 2 : 1);
     const duration = fadeDuration ?? animationDuration ?? 500;
     const isControlled = visible !== undefined;
 
@@ -301,8 +402,12 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
       >
         <NativeBlurOverlay
           radius={radius}
-          downsampling={downsampling}
+          downsampling={scale}
           brightness={brightness}
+          blurMode={blurMode}
+          blurTargetId={blurTargetId}
+          maxUpdateFps={maxUpdateFps}
+          captureOutset={captureOutset}
           blurStyle={blurStyle}
           vibrant={vibrant}
           style={[styles.fill, customStyles, style]}

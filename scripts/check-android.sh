@@ -53,10 +53,18 @@ package androidx.annotation;
 public @interface Nullable {}
 JAVA
 
+cat > "$BUILD/stubs/androidx/annotation/RequiresApi.java" <<'JAVA'
+package androidx.annotation;
+
+public @interface RequiresApi {
+  int value() default 1;
+}
+JAVA
+
 javac -nowarn --release 17 \
   -cp "$BUILD/react-android/classes.jar:$ANDROID_JAR" \
   -d "$BUILD/classes" \
-  "$BUILD/stubs/androidx/annotation/Nullable.java" \
+  "$BUILD/stubs/androidx/annotation"/*.java \
   "$GEN"/android/app/build/generated/source/codegen/java/com/facebook/react/viewmanagers/*.java \
   android/src/main/java/com/bluroverly/*.java
 

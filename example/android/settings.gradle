@@ -30,3 +30,6 @@ def resolveNodeModule = { String name ->
 
 gradle.ext.reactNativeDir = resolveNodeModule("react-native")
 gradle.ext.reactNativeCodegenDir = resolveNodeModule("@react-native/codegen")
+// hermesc ships in its own package, which the plugin only looks for under the
+// app's own node_modules — hoisting puts it out of reach, so resolve it here.
+gradle.ext.hermesCompilerDir = resolveNodeModule("hermes-compiler")

@@ -12,6 +12,7 @@ react {
     reactNativeDir = gradle.ext.reactNativeDir
     codegenDir = gradle.ext.reactNativeCodegenDir
     cliFile = new File(gradle.ext.reactNativeDir, "cli.js")
+    hermesCommand = new File(gradle.ext.hermesCompilerDir, "hermesc/%OS-BIN%/hermesc").path
 
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'

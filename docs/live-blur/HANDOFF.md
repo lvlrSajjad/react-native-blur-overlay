@@ -8,23 +8,26 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
 | Phase | State | Session notes |
 | --- | --- | --- |
 | 0 — Feasibility spike | **passed** (2026-09-16) | variant A fails structurally → we need a `<BlurTarget>`. Budget met on device: 15ms P90 / 0% jank at 60Hz, inputScale 0.5, Galaxy A22 (API 33, Helio G80). Re-record 0.2–0.4ms across two SoCs. 120Hz and the Fabric overhead remain untested. |
-| 1 — Live blur core (API 31+) | ready | ships `<BlurTarget>`, `downsampling` 2 by default; owes the Fabric-hierarchy measurement in `example/` |
-| 2 — Modal / window blur | blocked on 1 | |
-| 3 — Fallbacks, props, docs | blocked on 1 | |
-| 4 — SDK 37.2 fast path | optional, any time after 1 | |
-| 5 — Release 3.1.0 | blocked on 1–3 | |
-| 6 — Glass edge refraction | sketched, not scheduled | prototyped **and measured** 2026-09-16: works, and affordable at inputScale 0.5 (collapses at 1.0 — 100% jank at 90Hz). Not in 3.1.0. Phase 1 only owes it an outset-capable capture rect. |
+| 1 — Live blur core (API 31+) | **passed** (2026-09-17) | `<BlurTarget>` + `blurMode="live"` shipped. Measured in `example/` on the A22: 14ms P90 / 0.5% jank at 60Hz, 1.5% at 90Hz — level with the snapshot. `downsampling` 2 and `maxUpdateFps` 30 are both load-bearing defaults. 120Hz still untested. |
+| 2 — Modal / window blur | ready | |
+| 3 — Fallbacks, props, docs | ready | still owes the `setBackground()`/`borderRadius` fix — Phase 1 got half of it |
+| 4 — SDK 37.2 fast path | optional, any time | needs a capture-only mode to split re-record from blur; the library has none |
+| 5 — Release 3.1.0 | blocked on 2–3 | |
+| 6 — Glass edge refraction | sketched, not scheduled | prototyped **and measured** 2026-09-16: works, and affordable at inputScale 0.5 (collapses at 1.0 — 100% jank at 90Hz). Not in 3.1.0. **Phase 1 delivered the outset-capable capture rect it asked for** (`captureOutset`). |
 
-## Still owed after Phase 0
+## Still owed after Phase 1
 
-Phase 0's own exit criteria are met. Two things it could not reach, both inherited by
-Phase 1:
-
-- **120Hz.** The best panel available was the Galaxy A22's 90Hz, where everything passed.
-  No 120Hz device has run this.
-- **What React Native's Fabric hierarchy adds.** The spike is plain Views, per the phase
-  brief. This is only answerable in `example/`, so Phase 1 must measure it there rather
-  than inheriting the spike's numbers.
+- **120Hz.** Still nothing. The best panel available remains the Galaxy A22's 90Hz, where
+  everything passed. Inherited by whichever phase gets a 120Hz device.
+- ~~**What React Native's Fabric hierarchy adds.**~~ Answered in Phase 1: it costs a couple
+  of milliseconds of baseline and nothing on the blur's marginal cost.
+- **The split between re-record and blur inside Fabric.** The spike had a capture-only
+  variant; the library does not, so Phase 1 measured the two together. Phase 4 needs the
+  split to judge `setBackdropRenderEffect` honestly.
+- **Two unexplained anomalies** in the Phase 1 sweep — full resolution is ruinous at 60Hz
+  and fine at 90Hz, and the uncapped failure at 90Hz does not reproduce at full resolution.
+  Variant order is fixed in the sweep script and is the obvious confound; randomise it
+  before chasing anything else. See RESULTS.md.
 
 Hardware available to this project, none of it permanently attached — ask before assuming:
 
@@ -71,7 +74,10 @@ is trying to see. Phase 0 tried and threw the numbers away.
 | `ios/SajjadBlurOverlay.mm` | `UIVisualEffectView` + child mounting (already live; untouched by this work) |
 | `example/` | RN 0.87 app, npm workspace, Metro resolves the library to `src/` |
 | `scripts/check-android.sh`, `scripts/check-ios.sh` | compile checks without Gradle/CocoaPods |
+| `android/.../SajjadBlurTargetView.java` | `<BlurTarget>` — the subtree a live overlay captures, plus its registry |
+| `android/.../LiveBlur.java` | the API 31+ capture: `RenderNode` re-record + `RenderEffect`, reached only through out-of-line `@RequiresApi` helpers |
 | `docs/live-blur/spike/` | Phase 0's standalone harness — plain Views, no RN. Re-run it for the 120Hz number, or as the plain-View control when measuring what Fabric costs |
+| `docs/live-blur/example-sweep.sh` | Phase 1's sweep of the example app. Variants come from launch-intent extras, so nothing depends on tapping buttons |
 
 ### How the Android capture works today
 
@@ -124,6 +130,9 @@ adb shell dumpsys gfxinfo com.bluroverlayexample reset
 adb shell input swipe 360 900 360 200 120     # repeat to sustain a fling
 adb shell dumpsys gfxinfo com.bluroverlayexample | sed -n '/Janky frames/,/99th/p'
 ```
+
+Or, for the example app, `HZ=60 REPS=3 SERIAL=<serial> ./docs/live-blur/example-sweep.sh`,
+which does all of the above per variant. `ONLY=<variant>` restricts it to one.
 
 Use Macrobenchmark instead when a phase needs numbers precise enough to publish.
 
