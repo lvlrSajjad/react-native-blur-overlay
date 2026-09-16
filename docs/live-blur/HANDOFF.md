@@ -25,10 +25,17 @@ Phase 1:
   brief. This is only answerable in `example/`, so Phase 1 must measure it there rather
   than inheriting the spike's numbers.
 
-Hardware note for whoever picks this up: a Galaxy A70 is attached to this machine but is
-**API 30**, below the API 31 floor `RenderEffect` needs — it can only exercise the snapshot
-and capture-only paths. Emulator frame timings on this machine are not usable at all; the
-baseline alone drifts 18–31ms P90 with host load.
+Hardware available to this project, none of it permanently attached — ask before assuming:
+
+| Device | API | Refresh | Use |
+| --- | --- | --- | --- |
+| Galaxy A70 (SM-A705FN), the owner's | 30 | 60Hz | **cannot run live blur** — below the API 31 floor `RenderEffect` needs. Snapshot and capture-only paths only. |
+| Galaxy A22 (SM-A225F), **borrowed from a family member** | 33 | 60 / 90Hz | the device Phase 0's numbers come from. Ask first, and leave it as found: uninstall test APKs, restore refresh-rate settings, offer to turn developer options back off. |
+| Small_Phone / Mo_Device / Medium_Tablet AVDs | 36 | 60Hz | functional checks only |
+
+**Emulator frame timings on this machine are not usable as measurements.** The baseline
+alone drifts 18–31ms P90 with host load, which swamps the sub-millisecond effects this work
+is trying to see. Phase 0 tried and threw the numbers away.
 
 ## Read these first, in this order
 
@@ -63,6 +70,7 @@ baseline alone drifts 18–31ms P90 with host load.
 | `ios/SajjadBlurOverlay.mm` | `UIVisualEffectView` + child mounting (already live; untouched by this work) |
 | `example/` | RN 0.87 app, npm workspace, Metro resolves the library to `src/` |
 | `scripts/check-android.sh`, `scripts/check-ios.sh` | compile checks without Gradle/CocoaPods |
+| `docs/live-blur/spike/` | Phase 0's standalone harness — plain Views, no RN. Re-run it for the 120Hz number, or as the plain-View control when measuring what Fabric costs |
 
 ### How the Android capture works today
 
@@ -76,7 +84,9 @@ A `generation` counter drops stale async results.
 
 Two consequences worth remembering: `setBackground()` replaces RN's own background
 drawable, so `borderRadius`/`borderWidth`/`backgroundColor` on the overlay do nothing on
-Android; and the self-exclusion trick is only known to work for *software* capture.
+Android; and **the self-exclusion trick works only for software capture — Phase 0 proved it
+fails on a hardware canvas**, where it fires once and permanently blanks the overlay. Keep
+it on the snapshot path; it must not be carried into the live path. See RESULTS.md.
 
 ## Commands
 
@@ -115,6 +125,20 @@ adb shell dumpsys gfxinfo com.bluroverlayexample | sed -n '/Janky frames/,/99th/
 ```
 
 Use Macrobenchmark instead when a phase needs numbers precise enough to publish.
+
+**Three things Phase 0 learned the hard way about measuring this** — ignore them and you
+will record noise as a result:
+
+- **Interleave the baseline.** Run the no-blur baseline immediately before each variant, on
+  every repetition. Phase 0's test phone threw 69–99% jank outliers about one run in six,
+  on the *baseline* as often as on the variant; without an adjacent baseline those look
+  exactly like a regression.
+- **Drive the scroll from a `Choreographer` callback, not `input swipe`.** A fixed px/frame
+  auto-scroll is deterministic and removes input-injection variance. `spike/SpikeActivity`
+  does this behind `--ei durationMs`.
+- **Reset `gfxinfo` a few seconds in,** so process start and list warm-up are not charged to
+  the variant, and pin the refresh rate (`settings put system min_refresh_rate` /
+  `peak_refresh_rate`) rather than trusting the phone to stay where you left it.
 
 ## Per-phase prompts
 
