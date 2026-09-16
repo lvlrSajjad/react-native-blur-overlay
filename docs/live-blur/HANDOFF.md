@@ -7,12 +7,24 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
 
 | Phase | State | Session notes |
 | --- | --- | --- |
-| 0 — Feasibility spike | not started | decides whether we need a `<BlurTarget>` |
-| 1 — Live blur core (API 31+) | blocked on 0 | |
+| 0 — Feasibility spike | done (2026-09-16) | variant A fails structurally → we need a `<BlurTarget>`. Re-record costs 0.2–0.4ms on a Snapdragon 675. **No API 31+ device was available**, so the P90 budget is unproven — see below. |
+| 1 — Live blur core (API 31+) | ready | ships `<BlurTarget>`; must land the missing device measurement |
 | 2 — Modal / window blur | blocked on 1 | |
 | 3 — Fallbacks, props, docs | blocked on 1 | |
 | 4 — SDK 37.2 fast path | optional, any time after 1 | |
 | 5 — Release 3.1.0 | blocked on 1–3 | |
+
+## Owed from Phase 0
+
+The spike ran on an Android 17 emulator and a Galaxy A70. The A70 is **API 30**, below the
+API 31 floor `RenderEffect` needs, and the emulator's noise floor is several milliseconds
+against a sub-millisecond effect. So the structural verdict is settled and the exit
+criterion's *number* is not: nobody has yet shown variant B holding ≤16.6ms P90 at 60Hz on
+hardware that can run the feature, and 120Hz is untested on anything.
+
+Whoever next has an **API 31+ phone** attached should run `docs/live-blur/spike/sweep.sh`
+against it before or during Phase 1 and append the row to RESULTS.md. It is a ten-minute
+job and it is the only thing standing between Phase 0 and an unqualified pass.
 
 ## Read these first, in this order
 
@@ -131,16 +143,22 @@ public API needs a <BlurTarget> component.
 ### Phase 1
 
 ```
-Work Phase 1 of docs/live-blur/PLAN.md. Read PLAN.md, RESULTS.md and HANDOFF.md first,
-and follow the capture strategy Phase 0 selected — do not revisit that decision.
+Work Phase 1 of docs/live-blur/PLAN.md. Read PLAN.md, RESULTS.md and HANDOFF.md first.
+Phase 0 settled the capture strategy: a scoped <BlurTarget> subtree that does not contain
+the overlay. Do not revisit that — variant A is structurally impossible, not merely slow.
 
-Implement blurMode="live" for API 31+, with "snapshot" still the default: new prop in the
-Codegen spec and the Android manager, RenderEffect on the RenderThread, recapture only
-when the target actually draws, a capped update cadence, downscale via the existing
-downsampling prop, and automatic fallback to snapshot below API 31 or when capture fails.
+Implement blurMode="live" for API 31+, with "snapshot" still the default: a <BlurTarget>
+component, new props in the Codegen spec and the Android manager, RenderEffect on the
+RenderThread, recapture only when the target actually draws, a capped update cadence,
+downscale via the existing downsampling prop, and automatic fallback to snapshot below
+API 31 or when capture fails. Read the "Follow-ups Phase 1 must know" list in RESULTS.md
+before writing the capture code — it records the exact RenderNode calls that worked and
+the one that did not.
 
 Verify by running the example app on a device with the tile list scrolling behind the
-glass panel, and record frame numbers in RESULTS.md. `npm run check:android`,
+glass panel, and record frame numbers in RESULTS.md. Phase 0 could not get an API 31+
+device, so Phase 1 owes that measurement: P90 frame duration at 60Hz and, if the panel
+supports it, 120Hz. Do not call Phase 1 done without it. `npm run check:android`,
 `npm run typecheck`, `npm test` must all pass. Do not release.
 ```
 

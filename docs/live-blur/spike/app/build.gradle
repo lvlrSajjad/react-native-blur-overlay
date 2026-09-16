@@ -1,0 +1,32 @@
+plugins { id "com.android.application" }
+
+android {
+    namespace "com.bluespike"
+    compileSdk 37
+    buildToolsVersion "37.0.0"
+
+    defaultConfig {
+        applicationId "com.bluespike"
+        minSdk 29
+        targetSdk 36
+        versionCode 1
+        versionName "0.1"
+    }
+    buildTypes {
+        release {
+            // debug signing so the spike installs without a keystore; not debuggable,
+            // so HWUI and the JIT behave the way they will for a real user
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            debuggable false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "androidx.recyclerview:recyclerview:1.3.1"
+}

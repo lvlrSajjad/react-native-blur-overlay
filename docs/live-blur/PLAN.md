@@ -1,6 +1,8 @@
 # Live backdrop blur on Android — plan
 
-**Status:** Phase 0 not started · **Target release:** 3.1.0 (additive, opt-in) · **Last updated:** 2026-09-16
+**Status:** Phase 0 done — variant A failed, Phase 1 ships a `<BlurTarget>`; the P90 budget
+still needs an API 31+ device · **Target release:** 3.1.0 (additive, opt-in) ·
+**Last updated:** 2026-09-16
 
 ## The problem
 
@@ -72,12 +74,15 @@ valid `RenderNode`s are re-referenced (`drawRenderNode`) rather than re-drawn, s
 `draw()` override may never be called — and the overlay would blur **itself**,
 recursively. This is very likely why BlurView v3 introduced explicit targets.
 
-Phase 0 tests exactly this. The answer sets our public API:
+Phase 0 tests exactly this. **Answered in Phase 0: it does not survive.** The flag fires exactly once — on the first
+capture, when HWUI builds the overlay's display list — and leaves that display list empty,
+so the overlay never draws again. Every later capture re-references the overlay's
+`RenderNode` without consulting the flag at all. With the flag removed, HWUI drops the
+recursive reference and the backdrop blur disappears instead. See
+[RESULTS.md](./RESULTS.md).
 
-- **If self-exclusion survives hardware capture** → live blur with no app-tree
-  restructure, which no other RN blur library offers.
-- **If it does not** → we adopt a `<BlurTarget>` component like everyone else, and
-  Phase 2 becomes the reason to choose this library.
+So we adopt a `<BlurTarget>` component like everyone else, and Phase 2 becomes the reason
+to choose this library.
 
 ## Phases
 
