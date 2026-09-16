@@ -52,6 +52,14 @@ export type BlurStyle =
  * - `live` re-blurs a `<BlurTarget>` as it draws, so content moving behind the
  *   overlay stays blurred. Needs Android 12 (API 31) and a `<BlurTarget>`;
  *   without either it falls back to `snapshot`.
+ *
+ * Inside a `<Modal>`, `live` means something different, because a modal is its
+ * own Android window and no capture can reach across one: the overlay asks the
+ * system to blur behind the whole modal window. That needs no `<BlurTarget>`
+ * and costs nothing per frame, but it is the system's to give — where
+ * cross-window blur is off (some GPUs never have it, battery saver turns it off
+ * everywhere) it falls back to `snapshot`, which still shows the app behind the
+ * modal, frozen.
  */
 export type BlurMode = 'snapshot' | 'live';
 
@@ -139,6 +147,12 @@ export interface BlurOverlayProps {
    *
    * `live` needs Android 12 (API 31) and a `<BlurTarget>` around the content
    * to blur; without either it falls back to `snapshot`.
+   *
+   * Inside a `<Modal>` it needs neither: a modal is its own window, so `live`
+   * there asks the system to blur behind that window. `radius` still applies;
+   * `downsampling`, `blurTargetId`, `maxUpdateFps` and `captureOutset` do not,
+   * because nothing is being captured. The overlay has to cover the modal —
+   * a window blur has no way to be scoped to part of one.
    *
    * @default 'snapshot'
    */

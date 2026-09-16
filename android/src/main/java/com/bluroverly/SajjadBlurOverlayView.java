@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.drawable.BitmapDrawable;
@@ -40,6 +41,11 @@ import java.util.concurrent.Executors;
  *       and hand it to the RenderThread with a blur {@code RenderEffect}. The
  *       target must not contain this overlay — see {@link SajjadBlurTargetView}.
  * </ul>
+ *
+ * <p>An overlay inside a Dialog window — which is what an RN {@code <Modal />}
+ * is — takes a third route in live mode: no capture can cross a window
+ * boundary, so it asks the system to blur behind the whole window instead. See
+ * {@link WindowBlur}.
  *
  * <p>Live blur falls back to a snapshot below API 31, when no target is found,
  * and if a capture ever throws.
@@ -107,6 +113,68 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   private boolean warnedNoTarget;
   private boolean warnedAncestor;
   private boolean warnedUnsupported;
+  private boolean warnedWindowBlurOff;
+  private boolean warnedWindowBlurPartial;
+
+  /** A {@link WindowBlur}, or null. Untyped so ART never resolves it below API 31. */
+  @Nullable private Object windowBlur;
+
+  /** The system is blurring behind this overlay's window right now. */
+  private boolean windowBlurring;
+
+  /** This overlay is hosted in a Dialog window rather than the activity's. */
+  private boolean inDialogWindow;
+
+  /** The last thing {@link WindowBlur#apply} said. */
+  private int windowBlurStatus = WindowBlur.NOT_READY;
+
+  private boolean reportScheduled;
+
+  /**
+   * Explains a live blur that did not happen — a second after the fact.
+   *
+   * <p>A modal takes a few frames to reach its final size and insets, and on
+   * the way there the overlay genuinely does not cover its window and genuinely
+   * has no target. Warning about either the moment it is true fills logcat with
+   * lines that are wrong by the time anyone reads them, so the reasons are
+   * collected and only the ones that outlive the layout get printed.
+   */
+  private final Runnable reportLiveFallback =
+      () -> {
+        reportScheduled = false;
+
+        if (!windowBlurring && windowBlurStatus == WindowBlur.DISABLED && !warnedWindowBlurOff) {
+          warnedWindowBlurOff = true;
+          Log.w(
+              TAG,
+              "blurMode=\"live\" inside a <Modal /> blurs the app behind the modal through the "
+                  + "system, and this device has cross-window blur off — some GPUs never support "
+                  + "it, and battery saver turns it off everywhere. Falling back to the snapshot "
+                  + "blur, which still shows the app behind the modal, frozen.");
+        }
+
+        if (!windowBlurring && windowBlurStatus == WindowBlur.PARTIAL && !warnedWindowBlurPartial) {
+          warnedWindowBlurPartial = true;
+          Log.w(
+              TAG,
+              "blurMode=\"live\" inside a <Modal /> blurs behind the whole window — the system "
+                  + "has no way to blur behind part of one — but this overlay covers only part of "
+                  + "it, so it would blur pixels you did not ask for. Give the overlay the whole "
+                  + "modal, or leave it on the snapshot blur, which is scoped to the overlay's "
+                  + "own bounds.");
+        }
+
+        if (liveStalled && !warnedNoTarget) {
+          warnedNoTarget = true;
+          Log.w(
+              TAG,
+              "blurMode=\"live\" found no <BlurTarget id=\""
+                  + blurTargetId
+                  + "\"> in this window. A <Modal /> is a window of its own, so an overlay inside "
+                  + "one can only capture a <BlurTarget> that is inside the same <Modal />. "
+                  + "Falling back to the snapshot blur.");
+        }
+      };
 
   private final Runnable catchUp =
       () -> {
@@ -184,6 +252,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
     generation++;
     captureScheduled = false;
     stopLive();
+    releaseWindowBlur();
     setBackground(null);
   }
 
@@ -196,12 +265,21 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   @Override
   protected void onDetachedFromWindow() {
     stopLive();
+    // The window is not ours, so leave it as it was found — and do it before
+    // super(), while the dialog's decor view is still on the window manager.
+    releaseWindowBlur();
     super.onDetachedFromWindow();
   }
 
   @Override
   protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
     super.onSizeChanged(width, height, oldWidth, oldHeight);
+
+    // Whether a window blur is appropriate depends on whether this overlay
+    // covers the window, so the decision has to be re-made at every size —
+    // posted, because it can end in updateViewLayout() on the host window and
+    // that is not a thing to do from inside a layout pass.
+    post(this::syncMode);
 
     if (!liveOwnsBackdrop()) {
       scheduleBlur();
@@ -236,9 +314,37 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   protected void onDraw(Canvas canvas) {
     super.onDraw(canvas);
 
+    if (windowBlurring) {
+      // The blur itself is behind the window, so all this view contributes is
+      // the tint. Anything opaque here would hide the blur instead.
+      drawBrightnessScrim(canvas);
+      return;
+    }
+
     if (liveRunning && live != null && liveDraw(live, canvas, getWidth(), getHeight())) {
       liveDrawn = true;
     }
+  }
+
+  /**
+   * {@code brightness} for the window-blur path.
+   *
+   * <p>An approximation, and knowingly so: the other two paths own their pixels
+   * and shift them with a {@link ColorMatrix}, which can brighten past white.
+   * This one does not own anything — the blur belongs to the compositor — so the
+   * same number becomes a scrim over it. Equal-looking at the tints an overlay
+   * actually uses, and it degrades sensibly at the extremes.
+   */
+  private void drawBrightnessScrim(Canvas canvas) {
+    if (brightness == 0f) {
+      return;
+    }
+
+    final float clamped = Math.max(-255f, Math.min(255f, brightness));
+    final int alpha = Math.round(Math.abs(clamped));
+    final int tone = clamped < 0f ? 0 : 255;
+
+    canvas.drawColor(Color.argb(alpha, tone, tone, tone));
   }
 
   // --- live ---------------------------------------------------------------
@@ -257,8 +363,15 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   }
 
   private void syncMode() {
+    // A window blur, where one is possible, is both cheaper and more capable
+    // than anything this view can capture, so it gets first refusal.
+    syncWindowBlur();
+
     final boolean wantLive =
-        MODE_LIVE.equals(blurMode) && Build.VERSION.SDK_INT >= LIVE_SDK && isAttachedToWindow();
+        !windowBlurring
+            && MODE_LIVE.equals(blurMode)
+            && Build.VERSION.SDK_INT >= LIVE_SDK
+            && isAttachedToWindow();
 
     if (wantLive && !liveRunning) {
       live = newLiveBlur();
@@ -275,7 +388,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
       stopLive();
     }
 
-    if (!liveRunning) {
+    if (!liveRunning && !windowBlurring) {
       if (MODE_LIVE.equals(blurMode) && Build.VERSION.SDK_INT < LIVE_SDK && !warnedUnsupported) {
         warnedUnsupported = true;
         Log.i(
@@ -325,7 +438,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
    * leaves that overlay transparent.
    */
   private boolean liveOwnsBackdrop() {
-    return liveRunning && !liveStalled;
+    return windowBlurring || (liveRunning && !liveStalled);
   }
 
   /** A prop that feeds the blur changed: redo it, whichever path is running. */
@@ -494,7 +607,12 @@ public class SajjadBlurOverlayView extends ReactViewGroup
     liveStalled = true;
     liveCaptured = false;
 
-    if (!warnedNoTarget) {
+    if (inDialogWindow) {
+      // In a modal this is usually not the caller's mistake at all — the window
+      // blur just has not engaged yet — so it goes through the deferred report,
+      // which prints it only if it is still true a second from now.
+      scheduleLiveFallbackReport();
+    } else if (!warnedNoTarget) {
       warnedNoTarget = true;
       Log.w(
           TAG,
@@ -541,6 +659,120 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   @RequiresApi(LIVE_SDK)
   private static void liveRelease(Object live) {
     ((LiveBlur) live).release();
+  }
+
+  // --- window blur --------------------------------------------------------
+
+  /**
+   * Decides whether the system should blur behind this overlay's window.
+   *
+   * <p>Only in live mode, and only in a Dialog window: in the activity's own
+   * window the capture path is both scoped to the overlay and already proven,
+   * while a window blur there would blur the whole screen.
+   */
+  private void syncWindowBlur() {
+    final boolean wantWindowBlur =
+        MODE_LIVE.equals(blurMode)
+            && Build.VERSION.SDK_INT >= LIVE_SDK
+            && isAttachedToWindow()
+            && isInDialogWindow();
+
+    if (!wantWindowBlur) {
+      releaseWindowBlur();
+      return;
+    }
+
+    if (windowBlur == null) {
+      windowBlur = newWindowBlur(this, () -> post(this::syncMode));
+    }
+
+    // `radius` is in pre-downsampling pixels — i.e. already in screen pixels —
+    // and the system does its own downscaling, so `downsampling` has nothing to
+    // say here and is ignored rather than applied twice.
+    final int status = windowBlurApply(windowBlur, Math.max(1, radius));
+    // These comparisons are against compile-time constants, so they inline to
+    // literals and never make ART resolve WindowBlur on an older device.
+    final boolean blurring = status == WindowBlur.OK;
+
+    if (blurring != windowBlurring) {
+      windowBlurring = blurring;
+
+      if (blurring) {
+        // The compositor owns the backdrop now. A snapshot left underneath
+        // would sit on top of it, and there is nothing across a window
+        // boundary for the capture path to record.
+        stopLive();
+        generation++;
+        captureScheduled = false;
+        setBackground(null);
+      }
+
+      invalidate();
+    }
+
+    windowBlurStatus = status;
+
+    if (status == WindowBlur.DISABLED || status == WindowBlur.PARTIAL) {
+      scheduleLiveFallbackReport();
+    }
+  }
+
+  private void scheduleLiveFallbackReport() {
+    if (reportScheduled) {
+      return;
+    }
+
+    reportScheduled = true;
+    postDelayed(reportLiveFallback, 1000L);
+  }
+
+  /** Puts the window back the way it was found, and stops watching it. */
+  private void releaseWindowBlur() {
+    removeCallbacks(reportLiveFallback);
+    reportScheduled = false;
+
+    if (windowBlur != null) {
+      windowBlurRelease(windowBlur);
+      windowBlur = null;
+    }
+
+    if (windowBlurring) {
+      windowBlurring = false;
+      invalidate();
+      scheduleBlur();
+    }
+  }
+
+  /**
+   * Whether this overlay is in a window other than the activity's — which for
+   * a React Native app means a {@code <Modal />}, since that is a Dialog.
+   */
+  private boolean isInDialogWindow() {
+    final Activity activity = findActivity();
+
+    if (activity == null || activity.getWindow() == null) {
+      // Nothing to compare against, so which window this is cannot be told.
+      return false;
+    }
+
+    inDialogWindow = getRootView() != activity.getWindow().getDecorView();
+
+    return inDialogWindow;
+  }
+
+  @RequiresApi(LIVE_SDK)
+  private static Object newWindowBlur(View owner, Runnable onEnabledChanged) {
+    return new WindowBlur(owner, onEnabledChanged);
+  }
+
+  @RequiresApi(LIVE_SDK)
+  private static int windowBlurApply(Object blur, int radius) {
+    return ((WindowBlur) blur).apply(radius);
+  }
+
+  @RequiresApi(LIVE_SDK)
+  private static void windowBlurRelease(Object blur) {
+    ((WindowBlur) blur).release();
   }
 
   // --- snapshot -----------------------------------------------------------
@@ -658,25 +890,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
    */
   @Nullable
   private View findCaptureRoot() {
-    Activity activity = null;
-
-    final Context context = getContext();
-
-    if (context instanceof ThemedReactContext) {
-      activity = ((ThemedReactContext) context).getCurrentActivity();
-    }
-
-    if (activity == null) {
-      Context current = context;
-
-      while (activity == null && current instanceof ContextWrapper) {
-        if (current instanceof Activity) {
-          activity = (Activity) current;
-        } else {
-          current = ((ContextWrapper) current).getBaseContext();
-        }
-      }
-    }
+    final Activity activity = findActivity();
 
     if (activity != null) {
       final View content = activity.getWindow().getDecorView().findViewById(android.R.id.content);
@@ -689,5 +903,31 @@ public class SajjadBlurOverlayView extends ReactViewGroup
     final View root = getRootView();
 
     return root == this ? null : root;
+  }
+
+  /** The activity hosting this overlay, whichever window it ended up in. */
+  @Nullable
+  private Activity findActivity() {
+    final Context context = getContext();
+
+    if (context instanceof ThemedReactContext) {
+      final Activity activity = ((ThemedReactContext) context).getCurrentActivity();
+
+      if (activity != null) {
+        return activity;
+      }
+    }
+
+    Context current = context;
+
+    while (current instanceof ContextWrapper) {
+      if (current instanceof Activity) {
+        return (Activity) current;
+      }
+
+      current = ((ContextWrapper) current).getBaseContext();
+    }
+
+    return null;
   }
 }

@@ -1,6 +1,9 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Animated,
+  Easing,
   FlatList,
+  Modal,
   Platform,
   Pressable,
   StatusBar,
@@ -54,6 +57,14 @@ interface LaunchProps {
   maxUpdateFps?: number;
   downsampling?: number;
   panel?: boolean;
+  /** Opens the `<Modal>` demo on launch. */
+  modal?: boolean;
+  /**
+   * Shrink the modal's overlay so it covers only part of the modal window. A
+   * window blur cannot be scoped to part of a window, so a live overlay should
+   * decline it and fall back to a snapshot of its own bounds.
+   */
+  modalPartial?: boolean;
   /**
    * Point the panel at a `<BlurTarget>` that does not exist, to see what a live
    * overlay does when it cannot find one. It should fall back to a snapshot.
@@ -66,6 +77,8 @@ export default function App({
   maxUpdateFps: initialMaxUpdateFps,
   downsampling: initialDownsampling,
   panel,
+  modal,
+  modalPartial,
   blurTargetId,
 }: LaunchProps) {
   const [blurStyle, setBlurStyle] = useState<BlurStyle>('dark');
@@ -73,6 +86,7 @@ export default function App({
   const [downsampling, setDownsampling] = useState(initialDownsampling ?? 2);
   const [alwaysOn, setAlwaysOn] = useState(false);
   const [glass, setGlass] = useState(panel ?? false);
+  const [modalOpen, setModalOpen] = useState(modal ?? false);
   const [blurMode, setBlurMode] = useState<BlurMode>(
     initialBlurMode ?? 'snapshot'
   );
@@ -88,6 +102,13 @@ export default function App({
           overlay captures. Note that every overlay below is a *sibling* of this,
           never a child: an overlay cannot blur a subtree it is part of. */}
       <BlurTarget style={styles.target}>
+        {/* Only while the modal demo is up: something behind the modal that
+            keeps moving on its own. A modal's window covers the screen, so
+            there is no way to scroll the list under it — without this there is
+            nothing to tell a live window blur from a frozen snapshot. Gated so
+            that it never runs during a frame measurement of the list. */}
+        {modalOpen ? <MovingBand /> : null}
+
         <FlatList
           data={TILES}
           numColumns={4}
@@ -127,6 +148,7 @@ export default function App({
             selected={glass}
             onPress={() => setGlass((value) => !value)}
           />
+          <Button label="Modal" onPress={() => setModalOpen(true)} />
         </Section>
 
         <Section title="Keep it up (visible prop)">
@@ -252,7 +274,42 @@ export default function App({
         </BlurOverlay>
       </View>
 
-      {/* 4. Fully declarative. */}
+      {/* 4. Inside a <Modal />, which on Android is a window of its own.
+              Nothing can capture the app behind another window, so with
+              `blurMode="live"` the overlay asks the system to blur behind the
+              whole modal window instead — live, and composited for free. Where
+              cross-window blur is unavailable it falls back to the snapshot,
+              which still shows the app behind the modal, frozen. */}
+      <Modal
+        visible={modalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalOpen(false)}
+      >
+        <BlurOverlay
+          visible
+          blurStyle={blurStyle}
+          blurMode={blurMode}
+          radius={radius}
+          downsampling={downsampling}
+          brightness={-40}
+          fadeDuration={0}
+          onPress={() => setModalOpen(false)}
+          style={modalPartial ? styles.modalPartial : styles.centered}
+        >
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Blurred inside a Modal</Text>
+            <Text style={styles.cardText}>
+              blurMode is {blurMode}. On Android 12+ `live` blurs the app behind
+              this window as it moves; `snapshot` freezes it as it was when the
+              modal opened. Scroll the list behind, reopen, and compare.
+            </Text>
+            <Button label="Close" onPress={() => setModalOpen(false)} />
+          </View>
+        </BlurOverlay>
+      </Modal>
+
+      {/* 5. Fully declarative. */}
       <BlurOverlay
         visible={alwaysOn}
         blurStyle={blurStyle}
@@ -272,6 +329,48 @@ export default function App({
         </View>
       </BlurOverlay>
     </View>
+  );
+}
+
+/**
+ * A band that slides across the screen forever, on the native driver so that it
+ * keeps going while a modal is up and JS is idle.
+ */
+function MovingBand() {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    loop.start();
+
+    return () => loop.stop();
+  }, [progress]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.band,
+        {
+          transform: [
+            {
+              translateY: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-200, 900],
+              }),
+            },
+          ],
+        },
+      ]}
+    />
   );
 }
 
@@ -318,6 +417,16 @@ function Button({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0b1020' },
   target: { flex: 1 },
+  band: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    // Above the list, so the blur behind the modal has something unmistakable
+    // to smear.
+    zIndex: 10,
+  },
   content: {
     padding: 20,
     // The app runs edge to edge, so keep the header clear of the status bar.
@@ -359,6 +468,17 @@ const styles = StyleSheet.create({
   buttonLabel: { color: '#dbe7f3', fontSize: 13, fontWeight: '600' },
   buttonLabelSelected: { color: 'white' },
   centered: { alignItems: 'center', justifyContent: 'center' },
+  modalPartial: {
+    top: 120,
+    left: 24,
+    right: 24,
+    bottom: 'auto',
+    height: 360,
+    borderRadius: 16,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   card: {
     backgroundColor: 'rgba(255,255,255,0.92)',
     borderRadius: 16,

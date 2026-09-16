@@ -9,13 +9,13 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
 | --- | --- | --- |
 | 0 — Feasibility spike | **passed** (2026-09-16) | variant A fails structurally → we need a `<BlurTarget>`. Budget met on device: 15ms P90 / 0% jank at 60Hz, inputScale 0.5, Galaxy A22 (API 33, Helio G80). Re-record 0.2–0.4ms across two SoCs. 120Hz and the Fabric overhead remain untested. |
 | 1 — Live blur core (API 31+) | **passed** (2026-09-17) | `<BlurTarget>` + `blurMode="live"` shipped. Measured in `example/` on the A22: 14ms P90 / 0.5% jank at 60Hz, 1.5% at 90Hz — level with the snapshot. `downsampling` 2 and `maxUpdateFps` 30 are both load-bearing defaults. 120Hz still untested. |
-| 2 — Modal / window blur | ready | |
+| 2 — Modal / window blur | **passed** (2026-09-17) | `blurMode="live"` in a `<Modal>` blurs behind the window through `FLAG_BLUR_BEHIND` — *not* `Window.setBackgroundBlurRadius`, which needs a `Window` no public View API reaches; see RESULTS.md. Happy path on the API 37 emulator, degradation on the A22, plus the runtime toggle and the partial-coverage refusal. No physical device supporting cross-window blur has ever run it. |
 | 3 — Fallbacks, props, docs | ready | still owes the `setBackground()`/`borderRadius` fix — Phase 1 got half of it |
 | 4 — SDK 37.2 fast path | optional, any time | needs a capture-only mode to split re-record from blur; the library has none |
-| 5 — Release 3.1.0 | blocked on 2–3 | |
+| 5 — Release 3.1.0 | blocked on 3 | |
 | 6 — Glass edge refraction | sketched, not scheduled | prototyped **and measured** 2026-09-16: works, and affordable at inputScale 0.5 (collapses at 1.0 — 100% jank at 90Hz). Not in 3.1.0. **Phase 1 delivered the outset-capable capture rect it asked for** (`captureOutset`). |
 
-## Still owed after Phase 1
+## Still owed after Phase 2
 
 - **120Hz.** Still nothing. The best panel available remains the Galaxy A22's 90Hz, where
   everything passed. Inherited by whichever phase gets a 120Hz device.
@@ -28,6 +28,14 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
   and fine at 90Hz, and the uncapped failure at 90Hz does not reproduce at full resolution.
   Variant order is fixed in the sweep script and is the obvious confound; randomise it
   before chasing anything else. See RESULTS.md.
+- **A physical device that supports cross-window blur.** Phase 2's happy path has only
+  ever run on an emulator, because neither phone here has the feature. Acceptable for a
+  system-side effect with no frame cost of ours, but unverified on real glass.
+- **A shaped window blur.** `FLAG_BLUR_BEHIND` blurs the whole window, so Phase 2 refuses
+  an overlay that covers only part of a modal. `Window.setBackgroundBlurRadius` could be
+  masked to a shape instead, and React Native's `ExtraWindowEventListener` is the public
+  way to the `Window` it needs — available once this package's `react-native >= 0.80`
+  floor moves past it.
 
 Hardware available to this project, none of it permanently attached — ask before assuming:
 
@@ -40,10 +48,13 @@ Hardware available to this project, none of it permanently attached — ask befo
 **Cross-window blur is off on both physical phones and on only the emulator.** Checked
 2026-09-17: the A22 has `ro.surface_flinger.supports_background_blur` unset and
 SurfaceFlinger names no blur algorithm, so `isCrossWindowBlurEnabled()` returns false
-there; the API 36 emulator has the property set to 1 and reports `KawaseDualFilterV2`.
-Phase 2 therefore sees its happy path only on the emulator — acceptable, because window
-blur is system-side and Phase 2 needs no frame numbers — and gets to test its degradation
-path on hardware that genuinely lacks the feature rather than on a simulated switch.
+there; the emulator (API **37**, not 36 as this said before) has the property set to 1
+and reports `KawaseDualFilterV2`. Phase 2 confirmed both halves on exactly that split.
+Two things it learned that any later phase touching window blur will want:
+`dumpsys SurfaceFlinger | grep backgroundBlurRadius` shows the radius on the dialog's
+layer, which is the cheapest proof the mechanism is engaged; and
+`settings put global disable_window_blurs 1` flips `isCrossWindowBlurEnabled()` at
+runtime, which is what battery saver does.
 
 **Emulator frame timings on this machine are not usable as measurements.** The baseline
 alone drifts 18–31ms P90 with host load, which swamps the sub-millisecond effects this work
@@ -86,6 +97,7 @@ is trying to see. Phase 0 tried and threw the numbers away.
 | `android/.../LiveBlur.java` | the API 31+ capture: `RenderNode` re-record + `RenderEffect`, reached only through out-of-line `@RequiresApi` helpers |
 | `docs/live-blur/spike/` | Phase 0's standalone harness — plain Views, no RN. Re-run it for the 120Hz number, or as the plain-View control when measuring what Fabric costs |
 | `docs/live-blur/example-sweep.sh` | Phase 1's sweep of the example app. Variants come from launch-intent extras, so nothing depends on tapping buttons |
+| `android/.../WindowBlur.java` | Phase 2's Dialog/`<Modal>` path: `FLAG_BLUR_BEHIND` on the host window's layout params, and the reasons it declines |
 
 ### How the Android capture works today
 
@@ -242,6 +254,13 @@ Add the optional periodic re-blur for API 24–30 (off by default), finalise and
 the prop surface with an honest cost model, and if it was not done in Phase 1, replace
 setBackground() so that borderRadius/borderWidth/backgroundColor work on the overlay
 itself on Android. Update README and the example app.
+
+The prop surface is wider than Phase 1 left it: Phase 2 made `blurMode="live"` mean
+something different inside a <Modal> (a system window blur, no <BlurTarget> needed),
+where downsampling/maxUpdateFps/captureOutset/blurTargetId are all inert and brightness
+is a scrim rather than a colour-matrix offset. The README says nothing about any of it
+yet — Phase 2 documented it only in the JSDoc. That is Phase 3's to write up, and the
+cost model it owes is now three paths, not two.
 ```
 
 ### Phase 4

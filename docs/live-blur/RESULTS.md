@@ -549,3 +549,151 @@ have shown up in the sweep — the example app always has a valid target.
   plan allows.
 - **Whether a 30fps cap is visually acceptable** — measured as cheap, not judged by eye.
   The bound is one cap interval, so up to 33ms of staleness in the backdrop.
+
+## Phase 2 — window blur for Modal-hosted overlays — 2026-09-17
+
+**No frame numbers in this section, by design.** The blur is composited by
+SurfaceFlinger, not by us; there is no per-frame work on our side to measure. What
+is recorded instead is that the mechanism engages, that it is genuinely live, and
+that every way it can decline degrades to the snapshot rather than to nothing.
+
+### The API is not the one the plan named, and here is why
+
+PLAN.md says `Window.setBackgroundBlurRadius`. The shipped code uses
+`WindowManager.LayoutParams.FLAG_BLUR_BEHIND` + `setBlurBehindRadius(int)`,
+reached through `getRootView().getLayoutParams()` and pushed with
+`WindowManager.updateViewLayout`.
+
+The two are halves of the same Android 12 feature and are gated by the same
+`isCrossWindowBlurEnabled()`. The difference that decided it: `setBackgroundBlurRadius`
+is a method on `android.view.Window`, and **there is no public route from a `View`
+to the `Window` hosting it**. Checked against `android.jar`:
+
+```
+Window:                    public void setBackgroundBlurRadius(int);
+WindowManager.LayoutParams: public void setBlurBehindRadius(int);
+                            public static final int FLAG_BLUR_BEHIND;
+```
+
+React Native does have a route — `ExtraWindowEventListener`, which hands a library
+every Dialog `Window` a `<Modal>` creates, and is documented for exactly this — but it
+landed after the `react-native >= 0.80` this package supports, so compiling against
+it would break the floor. Reflection is out under constraint 1. The layout-params
+route needs neither and is public on every supported version.
+
+What that costs: background blur can be masked by the window's background drawable
+(so, shaped and rounded), blur-behind cannot — it blurs everything behind the window.
+That is why the overlay refuses the window path when it does not cover the window;
+see below. If the RN floor ever moves past `ExtraWindowEventListener`, switching to
+`setBackgroundBlurRadius` would buy a shaped blur and nothing else.
+
+### Tied to `blurMode="live"`, not automatic
+
+An overlay already inside a `<Modal>` in 3.0 gets a snapshot of the activity content
+behind it, which is a correct and frozen blur. Turning that into a live system blur
+without being asked would be a behaviour change for existing users, which the ground
+rules forbid. So window blur is what `live` *means* in a Dialog window, and `snapshot`
+in a modal is byte-for-byte what it was.
+
+Also inert on this path, because nothing is being captured: `downsampling`,
+`maxUpdateFps`, `captureOutset`, `blurTargetId`. `radius` applies unchanged (it is
+already in screen pixels). `brightness` becomes a scrim rather than a `ColorMatrix`
+offset — the compositor owns the pixels, so they cannot be shifted, only covered.
+
+### Happy path — Android 17 emulator
+
+Device: `sdk_gphone16k_arm64`, Android 17 / API 37, 1280×2856, release build.
+(HANDOFF said API 36; the image actually attached is API 37. Both have
+`ro.surface_flinger.supports_background_blur=1` and report `KawaseDualFilterV2`.)
+
+Method: `am start ... --es blurMode live --ez modal true`, settle 10s, then three
+screenshots 450ms apart. The example app's Modal demo now animates a band across the
+app *behind* the modal — a modal window covers the screen, so there is no way to
+scroll the list under it, and without moving content there is nothing to tell a live
+window blur from a frozen snapshot. It runs only while that demo is open, so the
+Phase 1 sweep is unaffected.
+
+| | `dumpsys SurfaceFlinger` | mean per-channel Δ between screenshots |
+| --- | --- | --- |
+| `blurMode="live"` | `backgroundBlurRadius=14` on the dialog layer | **47.6** then 10.0 |
+| `blurMode="snapshot"` | no layer with a non-zero radius | **0.00**, byte-identical |
+
+The radius on the layer is the `radius={14}` the demo passes, so it is ours. And the
+live backdrop changes between consecutive screenshots while the snapshot one is
+identical to the byte, with the same app doing the same thing — which is the whole
+claim: [`evidence/modal-window-blur.png`](./evidence/modal-window-blur.png).
+
+Worth knowing as a tell for future sessions: **window blur reaches under the status
+and navigation bars; the snapshot does not**, because the snapshot captures
+`android.R.id.content`. The two are distinguishable in a screenshot by that strip
+alone.
+
+### The fallback, on hardware that really lacks the feature — Galaxy A22
+
+Device: SM-A225F, Android 13 / API 33, Helio G80 / Mali-G52 MC2, 720×1600, release
+build. `ro.surface_flinger.supports_background_blur` unset, SurfaceFlinger names no
+blur algorithm, so `isCrossWindowBlurEnabled()` is false. This is the degradation
+path tested against a device that genuinely cannot do it rather than a simulated
+switch.
+
+Result: one warning naming cross-window blur as the reason, one naming the missing
+in-modal `<BlurTarget>`, and a working snapshot blur of the app behind the modal —
+not a transparent overlay, which is the failure Phase 1 found in the other fallback.
+Frozen across all three screenshots (Δ 0.00), which is what `snapshot` means.
+[`evidence/modal-fallback-a22.png`](./evidence/modal-fallback-a22.png)
+
+### Two more ways it can decline, both checked
+
+**Cross-window blur turned off at runtime.** `settings put global disable_window_blurs 1`
+is what battery saver does. With the modal already up and blurred, flipping it took
+the dialog layer's radius to 0, fired `addCrossWindowBlurEnabledListener`, and the
+overlay put a snapshot up in its place; flipping it back brought the blur layer back.
+[`evidence/modal-window-blur-disabled.png`](./evidence/modal-window-blur-disabled.png)
+
+**An overlay that covers only part of the modal.** A window blur cannot be scoped to
+part of a window, so blurring on its behalf would blur pixels the caller never asked
+for. The overlay measures its own bounds against the window's, minus system-bar
+insets, and declines: no blur layer, one warning, and a snapshot scoped to the
+overlay's own bounds while the rest of the screen behind the modal stays sharp.
+`--ez modalPartial true` in the example app reproduces it.
+[`evidence/modal-partial-declined.png`](./evidence/modal-partial-declined.png)
+
+### The warnings had to be deferred, and that is a finding
+
+The first build warned twice on every modal, on both devices, and both warnings were
+wrong by the time anyone read them: a modal reaches its final size and insets over
+several frames, and on the way there the overlay really does not cover its window and
+really has no target. Warning the moment a reason is true produces logcat lines that
+describe a state that lasted two frames.
+
+The reasons are now collected and printed one second later, and only the ones still
+true get printed. After that change the emulator's happy path logs **nothing at all**,
+and the A22 logs exactly the two lines that are permanently true of it. This is the
+same class of problem as Phase 1's "the fallback did not fall back": a live blur has
+several legitimate reasons to be a snapshot instead, and each one needs to be
+distinguishable in logs from the others.
+
+### Decisions
+
+- **`FLAG_BLUR_BEHIND` via layout params, not `Window.setBackgroundBlurRadius`** —
+  forced by the RN version floor, and revisitable if that floor moves.
+- **Window blur is what `live` means in a Dialog window**, and nothing changes for
+  `snapshot`.
+- **The overlay must cover the modal.** A window-wide effect offered for a
+  part-window request would be wrong pixels, silently. Declining is the safe half.
+- **Phase 2's exit criteria are met**: live blur behind a `<Modal>` on a device that
+  supports it, and graceful degradation on one that does not — plus the runtime
+  toggle and the partial-coverage case, neither of which the brief asked for.
+
+### Still open after Phase 2
+
+- **A physical device that supports cross-window blur.** Neither phone here does, so
+  the happy path has only ever run on an emulator. That is acceptable for a
+  system-side effect with no frame cost of ours, but nobody has looked at this on real
+  glass.
+- **`Window.setBackgroundBlurRadius` and a shaped blur.** Would let a rounded or
+  partial overlay have a window blur instead of being refused. Needs the RN floor at
+  or past `ExtraWindowEventListener`.
+- **iOS.** Untouched by this phase. An overlay inside an RN `<Modal>` on iOS is a
+  `UIVisualEffectView` in the modal's own view hierarchy and is already live.
+- **120Hz.** Unchanged from Phases 0 and 1: still nothing.

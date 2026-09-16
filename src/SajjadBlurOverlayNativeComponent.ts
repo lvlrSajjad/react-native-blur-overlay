@@ -18,7 +18,9 @@ export interface NativeProps extends ViewProps {
   /**
    * `"snapshot"` blurs once, when the overlay appears. `"live"` re-blurs a
    * `<BlurTarget>` every frame, and needs API 31+ — below that, and when no
-   * target is found, it falls back to `"snapshot"`. Android only.
+   * target is found, it falls back to `"snapshot"`. In a Dialog window (an RN
+   * `<Modal>`) `"live"` blurs behind the window instead, since no capture can
+   * cross a window boundary. Android only.
    */
   blurMode?: CodegenTypes.WithDefault<string, 'snapshot'>;
   /**

@@ -1,9 +1,10 @@
 # Live backdrop blur on Android — plan
 
-**Status:** Phase 1 **passed** — `blurMode="live"` ships with a `<BlurTarget>`, measured in
-the example app on a Galaxy A22: 14ms P90 / 0.5% jank at 60Hz and 1.5% at 90Hz, level with
-the snapshot it replaces · **Target release:** 3.1.0 (additive, opt-in) ·
-**Last updated:** 2026-09-17
+**Status:** Phase 2 **passed** — an overlay inside a `<Modal>` now blurs the app behind it
+live, through the system's own cross-window blur, and falls back to the snapshot wherever
+that is unavailable. Phase 1's in-window live blur measured 14ms P90 / 0.5% jank at 60Hz
+on a Galaxy A22, level with the snapshot it replaces · **Target release:** 3.1.0
+(additive, opt-in) · **Last updated:** 2026-09-17
 
 ## The problem
 
@@ -169,6 +170,14 @@ background, falling back to the current behaviour when cross-window blur is disa
 
 **Exit criteria:** a blur inside an RN `<Modal>` in the example app shows live blur of the
 app behind it on device; disabling cross-window blur degrades without breaking.
+
+**Met 2026-09-17**, with one correction to the scope above: the API used is
+`WindowManager.LayoutParams.FLAG_BLUR_BEHIND` + `setBlurBehindRadius`, not
+`Window.setBackgroundBlurRadius` — the same platform feature behind the same
+`isCrossWindowBlurEnabled()` gate, but reachable without a `Window`, which no public
+`View` API hands out. See RESULTS.md. The consequence is that the blur cannot be masked
+to a shape, so an overlay covering only part of a modal is refused rather than blurring
+the whole window.
 
 ### Phase 3 — Fallbacks, props and docs
 
