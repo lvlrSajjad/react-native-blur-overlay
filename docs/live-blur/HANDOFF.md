@@ -190,7 +190,8 @@ after <BlurTarget> is public is the expensive kind of change. That is the only t
 asks of Phase 1 — do not build any of the rest of it.
 
 Verify by running the example app on a device with the tile list scrolling behind the
-glass panel, and record frame numbers in RESULTS.md. Phase 0 measured the spike's plain-View
+frosted panel, and record frame numbers in RESULTS.md. ("Glass" now means the Phase 6
+refraction effect specifically; Phase 1 is plain live blur.) Phase 0 measured the spike's plain-View
 numbers on a Galaxy A22 (15ms P90, 0% jank at 60Hz, inputScale 0.5); what Fabric adds on top
 is still unknown, so measure in example/ rather than assuming the spike's numbers carry
 over. Do not call Phase 1 done without that. `npm run check:android`, `npm run typecheck`,
