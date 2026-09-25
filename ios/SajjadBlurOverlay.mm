@@ -19,6 +19,8 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   UIView *_containerView;
   NSString *_currentBlurStyle;
   BOOL _currentVibrant;
+  /** `blurMode="glass"`: the system's own Liquid Glass, where there is one. */
+  BOOL _currentGlass;
 }
 
 #pragma mark - Lifecycle
@@ -57,6 +59,14 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   _blurView.frame = self.bounds;
   _vibrancyView.frame = self.bounds;
   _containerView.frame = self.bounds;
+
+  // Glass draws its own shape, rim and highlight, so it has to be told the
+  // overlay's corner radius rather than be clipped to it — a clip would cut
+  // the rim off. React Native puts a uniform `borderRadius` on the layer.
+  if (_currentGlass) {
+    _blurView.layer.cornerRadius = self.layer.cornerRadius;
+    _blurView.layer.cornerCurve = self.layer.cornerCurve;
+  }
 }
 
 #pragma mark - Effect
@@ -65,18 +75,20 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
 - (void)applyEffect
 {
   UIBlurEffect *blurEffect = [self blurEffectForStyle:_currentBlurStyle];
+  UIVisualEffect *glassEffect = _currentGlass ? [self glassEffect] : nil;
 
   [_blurView removeFromSuperview];
   [_vibrancyView removeFromSuperview];
   _vibrancyView = nil;
 
-  _blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+  _blurView = [[UIVisualEffectView alloc] initWithEffect:glassEffect ?: blurEffect];
   _blurView.frame = self.bounds;
   _blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   // Index 0 keeps the blur behind the children.
   [self insertSubview:_blurView atIndex:0];
 
-  if (_currentVibrant) {
+  // A vibrancy effect is derived from a blur effect, and glass is not one.
+  if (_currentVibrant && glassEffect == nil) {
     UIVibrancyEffect *vibrancyEffect = [UIVibrancyEffect effectForBlurEffect:blurEffect];
     _vibrancyView = [[UIVisualEffectView alloc] initWithEffect:vibrancyEffect];
     _vibrancyView.frame = self.bounds;
@@ -89,6 +101,21 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
     // Re-adding moves the container back on top of the blur.
     [self addSubview:_containerView];
   }
+}
+
+/**
+ * iOS 26's Liquid Glass, or nil where there is none — an older OS, or an SDK
+ * too old to know the class — in which case `glass` is the ordinary blur.
+ */
+- (nullable UIVisualEffect *)glassEffect
+{
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26.0, *)) {
+    return [UIGlassEffect effectWithStyle:UIGlassEffectStyleRegular];
+  }
+#endif
+
+  return nil;
 }
 
 - (UIBlurEffect *)blurEffectForStyle:(NSString *)style
@@ -136,16 +163,24 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
 
 - (void)setBlurStyle:(nullable NSString *)blurStyle vibrant:(BOOL)vibrant
 {
+  [self setBlurStyle:blurStyle vibrant:vibrant glass:_currentGlass];
+}
+
+- (void)setBlurStyle:(nullable NSString *)blurStyle vibrant:(BOOL)vibrant glass:(BOOL)glass
+{
   NSString *style = blurStyle.length > 0 ? blurStyle : SajjadBlurOverlayDefaultStyle;
 
-  if ([style isEqualToString:_currentBlurStyle] && vibrant == _currentVibrant) {
+  if ([style isEqualToString:_currentBlurStyle] && vibrant == _currentVibrant &&
+      glass == _currentGlass) {
     return;
   }
 
   _currentBlurStyle = style;
   _currentVibrant = vibrant;
+  _currentGlass = glass;
 
   [self applyEffect];
+  [self setNeedsLayout];
 }
 
 #pragma mark - New architecture
@@ -162,7 +197,8 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   const auto &newViewProps = *std::static_pointer_cast<const SajjadBlurOverlayProps>(props);
 
   [self setBlurStyle:RCTNSStringFromStringNilIfEmpty(newViewProps.blurStyle)
-             vibrant:newViewProps.vibrant];
+             vibrant:newViewProps.vibrant
+               glass:newViewProps.blurMode == "glass"];
 
   [super updateProps:props oldProps:oldProps];
 }
@@ -184,7 +220,7 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   static const auto defaultProps = std::make_shared<const SajjadBlurOverlayProps>();
   _props = defaultProps;
 
-  [self setBlurStyle:SajjadBlurOverlayDefaultStyle vibrant:NO];
+  [self setBlurStyle:SajjadBlurOverlayDefaultStyle vibrant:NO glass:NO];
 }
 
 #else
@@ -199,6 +235,18 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
 - (nullable NSString *)blurStyle
 {
   return _currentBlurStyle;
+}
+
+- (void)setBlurMode:(nullable NSString *)blurMode
+{
+  [self setBlurStyle:_currentBlurStyle
+             vibrant:_currentVibrant
+               glass:[blurMode isEqualToString:@"glass"]];
+}
+
+- (nullable NSString *)blurMode
+{
+  return _currentGlass ? @"glass" : nil;
 }
 
 - (void)setVibrant:(BOOL)vibrant

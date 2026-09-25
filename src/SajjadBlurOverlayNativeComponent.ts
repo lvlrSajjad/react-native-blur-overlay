@@ -16,6 +16,10 @@ export interface NativeProps extends ViewProps {
    */
   brightness?: CodegenTypes.WithDefault<CodegenTypes.Float, 0>;
   /**
+   * Colour saturation of the blur, 1 leaves it untouched. Android only.
+   */
+  saturation?: CodegenTypes.WithDefault<CodegenTypes.Float, 1>;
+  /**
    * `"snapshot"` blurs once, when the overlay appears. `"live"` re-blurs a
    * `<BlurTarget>` every frame, and needs API 31+ — below that, and when no
    * target is found, it falls back to `"snapshot"`. In a Dialog window (an RN

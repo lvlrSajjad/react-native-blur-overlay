@@ -18,6 +18,7 @@ RCT_EXPORT_MODULE(SajjadBlurOverlay)
 
 RCT_EXPORT_VIEW_PROPERTY(blurStyle, NSString)
 RCT_EXPORT_VIEW_PROPERTY(vibrant, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(blurMode, NSString)
 
 // Android-only props, accepted so the same JS props work on both platforms.
 RCT_EXPORT_VIEW_PROPERTY(radius, NSNumber)

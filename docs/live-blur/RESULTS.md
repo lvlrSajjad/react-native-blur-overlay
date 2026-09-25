@@ -887,3 +887,138 @@ is owed before 3.1.0 ships.
 - **The "random spots" instability.** Unreproduced.
 - **Saturation.** The gap to an iOS material is a saturation boost we do not have.
 - **120Hz.** Unchanged since Phase 0.
+
+## Phase 6 — the glass edge, first session — 2026-09-26
+
+**Unfinished, and no frame numbers.** A 30-minute session, built and judged visually on the
+Galaxy A22 (API 33) with the owner comparing against their iOS 26 app. It ends with
+`blurMode="glass"` and `saturation` working; measurement waits for settled code, per the
+ground rule.
+
+### What landed
+
+- **`blurMode="glass"`**, the third rung. It is `live` plus a lens, falls back to `live`
+  below API 33 (and so to `snapshot` below 31), and behaves as `live` inside a `<Modal>`.
+  Codegen already typed `blurMode` as a string, so the spec did not change. `inputScale`
+  is clamped to ≤ 0.5 whatever `downsampling` says, per the measured collapse at 1.0.
+- **`saturation`** (default 1), one `ColorMatrix.setSaturation()` shared by the snapshot
+  and the live path via `SajjadBlurOverlayView.colorMatrix()`. The demo uses 1.8. It is the
+  single biggest improvement per line of code in this phase: the washed-out look is gone.
+- **A capsule tab bar demo** (`--ez tabBar true`), which is the acceptance shape.
+
+### A pill never had a radius, on any live path
+
+The first glass build drew a rectangle: `cornerRadius()` returned 0. React Native's
+`CompositeBackgroundDrawable.getOutline` **always** publishes a rounded outline as a *path*
+(`setPath` on API 30+), and a path outline has no radius to read back. So the Phase 3 claim
+that live blur clips to a uniform radius depended on how the outline was published, and it
+fails for a capsule. The fix reads a uniform `borderRadius` straight from
+`BackgroundStyleApplicator` when the outline is a path, returns 0 if any per-corner radius
+is set, and clamps to half the short side. This also fixes plain `live` for pills.
+[`phase6-v1-square.png`](./spike/evidence/phase6-v1-square.png)
+
+### The spike's lens was the wrong optics for this target — mirror inward, not refract outward
+
+With the radius fixed, the spike's shader (Snell over a bevel, sampling *outward* from
+the sharp capture, thin band pulling ~15:1) read to the owner as "a water drop" with "no
+distortion towards the edges". Their iOS screenshot settled it: one line of text sits both
+blurred in the interior *and upside-down* against the bar's bottom edge, reflected about a
+line ~12pt inside it. Apple's own tab bars and mini-player (the Verge WWDC GIF) show the
+same flipped content along the pill edges. So:
+
+1. **The band mirrors content from inside, about its inner lip.** Offset inward is
+   `band * t * (1 + t)` (t = 0 at the lip, 1 at the border): continuous with the interior
+   at the lip, two bands in at the border. The capture no longer needs a large bleed for
+   the lens, so the outset dropped from ~84dp to 8dp.
+2. **The band samples the frost, not the sharp capture.** That keeps it exactly as blurred
+   as the interior, which is what "keeps the blur quality" means in the owner's words. The
+   spike's finding 3 (refract sharp pixels) was right for its outward lens and wrong for
+   this one. The separate rim blur is gone: one frost node, drawn twice (placed, and
+   through the lens).
+3. **Band ≈ a fifth of the short side, capped at 12dp**, against the spike's 4–6dp.
+4. **The rim light is a 1dp hairline at low gain** (rim 0.04, specular 0.28), still
+   brighter where the light hits top-left and bottom-right. The spike's gains read as a
+   glossy tube.
+
+[`phase6-v2-mirror.png`](./spike/evidence/phase6-v2-mirror.png) ·
+[`phase6-v3-saturation.png`](./spike/evidence/phase6-v3-saturation.png)
+
+Apple's HIG says only this about the optics: two variants, *regular* (blurs and adjusts
+luminosity; most bars) and *clear* (highly translucent, optional 35% dim over bright
+content). Nothing quantitative is published. The macOS variant sheet the owner found
+shows the variants differ in tint, luminosity and blur, not edge shape.
+
+### Open
+
+- **Owner sign-off on the look.** v3 had not been reviewed when the session ended.
+- **Cost.** Unmeasured for this lens. It should be cheaper than the spike (3 taps against
+  5, no rim blur, a smaller capture), but that is an argument, not a number.
+- **Tuning is hard-coded** in `LiveBlur` (band, gains). Whether any of it becomes a prop,
+  or a `regular`/`clear` variant, is undecided.
+- **Kyant0/AndroidLiquidGlass** was still being read when the session ended. Check its
+  licence before borrowing anything from it.
+
+### iOS uses the system's glass
+
+On iOS, `blurMode="glass"` now puts a `UIGlassEffect` (regular) in the effect view on
+iOS 26+. It is compile-guarded on `__IPHONE_26_0` so older SDKs still build, and falls back
+to the `blurStyle` blur below iOS 26. The corner radius is copied from the overlay's layer,
+because glass draws its own rim and a clip would cut it off. `vibrant` does not apply,
+since a vibrancy effect needs a blur effect to derive from. This is what the prototype
+section recommended: parity on iOS comes from the real thing, not a port of this shader.
+**Not yet run on an iOS 26 simulator**, and whether the glass follows `layer.cornerRadius`
+or needs iOS 26's `cornerConfiguration` is unverified.
+
+### Prior art: QWEA0/Liquid-Glass-Android (MIT)
+
+MIT, the same licence as ours, so porting is fine as long as its copyright notice
+(pandadog) is kept. It independently lands on the same structure: blur first, then one
+AGSL lens sampling the blurred backdrop **inward** by default. Worth porting, roughly in
+order of visual impact:
+
+1. **Two equal specular lobes**, `pow(max(±dot(n, -light), 0), 4.5)`: front-lit plus the
+   back-lit inner reflection. Ours has one strong lobe and a weak one.
+2. **A soft inward glow** (≤6px, front lobe only) under the 2px hairline;
+   `spec = hair*0.70*(lobeF+lobeB) + glow*0.10*lobeF`.
+3. **Chromatic dispersion** (0.10), with R and B offset along the same normal.
+4. **A tunable falloff**, `(pow(1+4t, -falloff) - g)/(1 - g)`, falloff 2.
+5. **Regular/clear materials**: regular blur ×1.0, tint `0x24FFFFFF`; clear blur ×0.35,
+   dim 0.16, tint `0x14FFFFFF`. These match the HIG's two variants.
+6. **Sensor-driven light direction**, low-pass filtered.
+
+It publishes no performance numbers. Its corners are circular arcs, not continuous
+(superellipse) corners, like ours.
+
+### Session 1, later: the lens is now a port of both reference repos
+
+The owner shared Kyant0/AndroidLiquidGlass (Apache-2.0) and QWEA0/Liquid-Glass-Android
+(MIT) and asked to use them. `Glass.java` is now a port with both copyright notices in its
+header. It uses Kyant0's quarter-circle profile, `1 - sqrt(1 - x²)`, pulling inward, and
+QWEA0's two equal highlight lobes on a hairline, an inward glow on the lit side, and
+per-channel dispersion. It runs as **one pass chained after the blur on the capture node**,
+the same node `live` uses, which retired the frost/rim/placed nodes from earlier in the
+session.
+
+The owner said v4 looked like neither iOS nor the repos. Set against QWEA0's published
+screenshots, three things were wrong, and none of them was the shader's structure:
+
+1. **The demo blurred at 40dp.** The references keep the content under the bar nearly
+   legible, and a lens can only bend detail it can still see. The tab bar now blurs at 3dp
+   with `downsampling={2}`. At the demo's default of 4, glass ran at quarter resolution,
+   because the clamp is a ceiling, not a floor.
+2. **The pull was 1x the band.** QWEA0 defaults to ~3.3x (160px over 48px). It is now 2.5x,
+   capped at 0.7 of the short side, over a 24dp band capped at 0.4 of it.
+3. **The backdrop had nothing to bend**: flat tiles with 11sp numbers. The tiles now carry
+   26sp glyphs. This is correction 3 of the prototype section again: the test backdrop
+   decides whether the effect can be seen at all.
+
+The owner then said it "looks quite liquidy" and asked to tighten the rim light: the
+hairline went 1.5 → 0.75dp, the glow 6 → 3dp, and the lobe exponent 4.5 → 7.
+[`phase6-v5-rim.png`](./spike/evidence/phase6-v5-rim.png)
+
+Still unmeasured. Parameters are hard-coded in `LiveBlur` (`glassBand`, `glassPull`) and
+`Glass.lens()` call sites.
+
+iOS: the example app **crashes at launch on iOS 27** (`UIApplication` requires UIScene
+lifecycle adoption). This is an example-app problem, not a library one. On iOS 26 it has not
+been seen running yet; that is waiting on simulator access.

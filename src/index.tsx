@@ -63,7 +63,7 @@ export type BlurStyle =
  * everywhere) it falls back to `snapshot`, which still shows the app behind the
  * modal, frozen.
  */
-export type BlurMode = 'snapshot' | 'live';
+export type BlurMode = 'snapshot' | 'live' | 'glass';
 
 export interface BlurTargetProps extends ViewProps {
   /**
@@ -154,8 +154,22 @@ export interface BlurOverlayProps {
    */
   brightness?: number;
   /**
-   * Whether the Android blur is taken once or kept up to date. Android only —
-   * the iOS overlay is a `UIVisualEffectView` and is always live.
+   * Colour saturation of the blur: 1 leaves it as it is, 0 is greyscale, and
+   * above 1 is more vivid. A blur is an average, so it washes colour out;
+   * iOS's materials put it back with roughly 1.8, which is why an Android
+   * overlay at 1 reads flatter beside an iOS one. Applies to the snapshot and
+   * the live blur; a window blur inside a `<Modal>` is the system's and cannot
+   * take it. Android only.
+   *
+   * @default 1
+   */
+  saturation?: number;
+  /**
+   * Whether the Android blur is taken once or kept up to date. On iOS the
+   * overlay is a `UIVisualEffectView` and always live, so only `glass` means
+   * anything there: it uses the system's own Liquid Glass (`UIGlassEffect`) on
+   * iOS 26 and later, and the `blurStyle` blur below that. `vibrant` does not
+   * apply to glass.
    *
    * `live` needs Android 12 (API 31) and a `<BlurTarget>` around the content
    * to blur; without either it falls back to `snapshot`.
@@ -165,6 +179,16 @@ export interface BlurOverlayProps {
    * `downsampling`, `blurTargetId`, `maxUpdateFps` and `captureOutset` do not,
    * because nothing is being captured. The overlay has to cover the modal —
    * a window blur has no way to be scoped to part of one.
+   *
+   * `glass` is `live` plus a lens along the edge: a band just inside the
+   * border mirrors the blurred content next to it, so the backdrop bends as it
+   * reaches the rim, lit by a hairline whose brightness varies around the
+   * shape — the Liquid Glass look. It needs Android 13 (API 33) and falls back
+   * to `live` below that. It follows the overlay's `borderRadius` (uniform
+   * radii only, so a capsule works) and never captures above half resolution,
+   * whatever `downsampling` says: at full resolution it measured 100% jank at
+   * 90Hz on a Galaxy A22. Inside a `<Modal>` it behaves as `live`. Pair it
+   * with `saturation` around 1.8 for an iOS-like material.
    *
    * @default 'snapshot'
    */
@@ -290,6 +314,7 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
       radius = 20,
       downsampling,
       brightness = 0,
+      saturation = 1,
       blurMode = 'snapshot',
       blurTargetId = DEFAULT_ID,
       maxUpdateFps = 30,
@@ -313,7 +338,7 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
     // A live blur re-runs every frame, so it starts from the downscale Phase 0
     // measured as free on low-end hardware; a snapshot runs once and can afford
     // full resolution.
-    const scale = downsampling ?? (blurMode === 'live' ? 2 : 1);
+    const scale = downsampling ?? (blurMode === 'snapshot' ? 1 : 2);
     const duration = fadeDuration ?? animationDuration ?? 500;
     const isControlled = visible !== undefined;
 
@@ -462,6 +487,7 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
           radius={radius}
           downsampling={scale}
           brightness={brightness}
+          saturation={saturation}
           blurMode={blurMode}
           blurTargetId={blurTargetId}
           maxUpdateFps={maxUpdateFps}

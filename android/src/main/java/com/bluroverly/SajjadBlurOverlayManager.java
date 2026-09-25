@@ -84,6 +84,12 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<SajjadBlurOverlay
   }
 
   @Override
+  @ReactProp(name = "saturation", defaultFloat = 1f)
+  public void setSaturation(SajjadBlurOverlayView view, float value) {
+    view.setSaturation(value);
+  }
+
+  @Override
   @ReactProp(name = "blurMode")
   public void setBlurMode(SajjadBlurOverlayView view, @Nullable String value) {
     view.setBlurMode(value);

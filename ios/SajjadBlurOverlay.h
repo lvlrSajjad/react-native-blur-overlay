@@ -21,6 +21,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy, nullable) NSString *blurStyle;
 @property (nonatomic, assign) BOOL vibrant;
+/** Only `"glass"` means anything on iOS: the system's Liquid Glass, iOS 26+. */
+@property (nonatomic, copy, nullable) NSString *blurMode;
 
 // Android-only props, accepted here so that the same JS props can be passed on
 // both platforms without warnings.

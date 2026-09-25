@@ -23,7 +23,10 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.facebook.react.uimanager.BackgroundStyleApplicator;
+import com.facebook.react.uimanager.LengthPercentage;
+import com.facebook.react.uimanager.PixelUtil;
 import com.facebook.react.uimanager.ThemedReactContext;
+import com.facebook.react.uimanager.style.BorderRadiusProp;
 import com.facebook.react.views.view.ReactViewGroup;
 
 import java.lang.ref.WeakReference;
@@ -63,6 +66,9 @@ public class SajjadBlurOverlayView extends ReactViewGroup
 
   static final String MODE_LIVE = "live";
 
+  /** Live, plus the refracting edge. Falls back to live below API 33. */
+  static final String MODE_GLASS = "glass";
+
   /** The first API level with {@code RenderEffect}. */
   private static final int LIVE_SDK = Build.VERSION_CODES.S;
 
@@ -78,6 +84,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   private int radius = 20;
   private float downsampling = 1f;
   private float brightness = 0f;
+  private float saturation = 1f;
   private String blurMode = "snapshot";
   private String blurTargetId = SajjadBlurTargetView.DEFAULT_ID;
   private int maxUpdateFps = 30;
@@ -281,6 +288,35 @@ public class SajjadBlurOverlayView extends ReactViewGroup
     }
   }
 
+  public void setSaturation(float saturation) {
+    if (this.saturation != saturation) {
+      this.saturation = saturation;
+      onBlurInputChanged();
+    }
+  }
+
+  /**
+   * The colour matrix both capture paths apply after the blur, or null when it
+   * would change nothing: saturation first, then the brightness offset.
+   */
+  @Nullable
+  static ColorMatrix colorMatrix(float brightness, float saturation) {
+    if (brightness == 0f && saturation == 1f) {
+      return null;
+    }
+
+    final ColorMatrix matrix = new ColorMatrix();
+    matrix.setSaturation(Math.max(0f, saturation));
+
+    final float offset = Math.max(-255f, Math.min(255f, brightness));
+    final float[] values = matrix.getArray();
+    values[4] += offset;
+    values[9] += offset;
+    values[14] += offset;
+
+    return matrix;
+  }
+
   public void setBlurMode(@Nullable String mode) {
     final String next = mode == null || mode.isEmpty() ? "snapshot" : mode;
 
@@ -470,6 +506,11 @@ public class SajjadBlurOverlayView extends ReactViewGroup
    * round rect — per-corner radii — cannot be a RenderNode clip at all, so a
    * live blur stays square there while a snapshot, clipped by path, does not.
    */
+  /** Both live rungs: everything that is true of "live" is true of "glass". */
+  private boolean isLiveMode() {
+    return MODE_LIVE.equals(blurMode) || MODE_GLASS.equals(blurMode);
+  }
+
   private float cornerRadius() {
     final ViewOutlineProvider provider = getOutlineProvider();
 
@@ -482,7 +523,36 @@ public class SajjadBlurOverlayView extends ReactViewGroup
 
     final float radius = shape.getRadius();
 
-    return radius > 0f && shape.canClip() ? radius : 0f;
+    if (radius > 0f && shape.canClip()) {
+      return radius;
+    }
+
+    // React Native hands the outline over as a path, which has no radius to
+    // read back — reliably so for a capsule, whose radius is clamped to half its
+    // height. A path is fine as long as nothing but a uniform `borderRadius`
+    // shaped it, so read that from the style instead.
+    return uniformBorderRadius();
+  }
+
+  private float uniformBorderRadius() {
+    final LengthPercentage all =
+        BackgroundStyleApplicator.getBorderRadius(this, BorderRadiusProp.BORDER_RADIUS);
+
+    if (all == null) {
+      return 0f;
+    }
+
+    for (BorderRadiusProp corner : BorderRadiusProp.values()) {
+      if (corner != BorderRadiusProp.BORDER_RADIUS
+          && BackgroundStyleApplicator.getBorderRadius(this, corner) != null) {
+        return 0f;
+      }
+    }
+
+    final float half = Math.min(getWidth(), getHeight()) / 2f;
+    final float px = PixelUtil.toPixelFromDIP(all.resolve(PixelUtil.toDIPFromPixel(Math.min(getWidth(), getHeight()))));
+
+    return Math.max(0f, Math.min(px, half));
   }
 
   /**
@@ -572,7 +642,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
 
     final boolean wantLive =
         !windowBlurring
-            && MODE_LIVE.equals(blurMode)
+            && isLiveMode()
             && Build.VERSION.SDK_INT >= LIVE_SDK
             && isAttachedToWindow();
 
@@ -595,7 +665,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
     syncPreDrawListener();
 
     if (!liveRunning && !windowBlurring) {
-      if (MODE_LIVE.equals(blurMode) && Build.VERSION.SDK_INT < LIVE_SDK && !warnedUnsupported) {
+      if (isLiveMode() && Build.VERSION.SDK_INT < LIVE_SDK && !warnedUnsupported) {
         warnedUnsupported = true;
         Log.i(
             TAG,
@@ -720,7 +790,20 @@ public class SajjadBlurOverlayView extends ReactViewGroup
     final float outset = Math.max(captureOutset, 1f - Math.min(width, height) / 2f);
 
     if (!liveCapture(
-        live, target, width, height, offsetX, offsetY, outset, inputScale, radius, brightness)) {
+        live,
+        target,
+        width,
+        height,
+        offsetX,
+        offsetY,
+        outset,
+        inputScale,
+        radius,
+        brightness,
+        saturation,
+        MODE_GLASS.equals(blurMode),
+        cornerRadius(),
+        getResources().getDisplayMetrics().density)) {
       Log.w(TAG, "Could not capture the blur target, falling back to a snapshot.");
       stopLive();
       blurMode = "snapshot";
@@ -853,9 +936,16 @@ public class SajjadBlurOverlayView extends ReactViewGroup
       float outset,
       float inputScale,
       float radius,
-      float brightness) {
+      float brightness,
+      float saturation,
+      boolean glass,
+      float corner,
+      float density) {
     return ((LiveBlur) live)
-        .capture(target, width, height, dx, dy, outset, inputScale, radius, brightness);
+        .capture(
+            target, width, height, dx, dy, outset, inputScale, radius, brightness, saturation, glass,
+            corner,
+            density);
   }
 
   @RequiresApi(LIVE_SDK)
@@ -880,7 +970,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
    */
   private void syncWindowBlur() {
     final boolean wantWindowBlur =
-        MODE_LIVE.equals(blurMode)
+        isLiveMode()
             && Build.VERSION.SDK_INT >= LIVE_SDK
             && isAttachedToWindow()
             && isInDialogWindow();
@@ -1102,18 +1192,10 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   private void applySnapshot(Bitmap bitmap) {
     final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
 
-    if (brightness != 0f) {
-      final float offset = Math.max(-255f, Math.min(255f, brightness));
+    final ColorMatrix matrix = colorMatrix(brightness, saturation);
 
-      paint.setColorFilter(
-          new ColorMatrixColorFilter(
-              new ColorMatrix(
-                  new float[] {
-                    1, 0, 0, 0, offset,
-                    0, 1, 0, 0, offset,
-                    0, 0, 1, 0, offset,
-                    0, 0, 0, 1, 0
-                  })));
+    if (matrix != null) {
+      paint.setColorFilter(new ColorMatrixColorFilter(matrix));
     }
 
     if (snapshot != null && snapshot != bitmap && spare == null) {

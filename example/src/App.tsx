@@ -62,12 +62,23 @@ const GLASS_RADIUS = Math.round(PixelRatio.get() * GLASS_DP);
 // visibly change how blurred the panel is.
 const GLASS_DOWNSAMPLING = 4;
 
+// The glass tab bar blurs lightly: a lens can only bend detail it can still see,
+// and the Liquid Glass references keep the content under the bar nearly legible.
+const TAB_BAR_RADIUS = Math.round(PixelRatio.get() * 3);
+
+// Shapes on the tiles, so there is detail behind the glass for the lens to bend.
+const GLYPHS = ['◆', '●', '▲', '■', '✦', '♥', '★', '✚'];
+
 const UPDATE_RATES = [30, 60, 0];
 
 // Off, then the rate Phase 3 measured as affordable and judged by eye as the
 // point where a periodic re-blur stops looking like a slideshow. 5 and 15 both
 // read as broken; 30 does not.
 const SNAPSHOT_RATES = [0, 30];
+
+const BLUR_MODES: BlurMode[] = ['snapshot', 'live', 'glass'];
+
+const TABS = ['Home', 'Work', 'Assets', 'More'];
 
 /**
  * Initial props, which on Android come from the launch intent's extras — see
@@ -89,6 +100,11 @@ interface LaunchProps {
   snapshotUpdateFps?: number;
   /** Blur radius for the glass panel, in physical pixels. */
   glassRadius?: number;
+  /**
+   * Shows the floating capsule tab bar — the shape `blurMode="glass"` has to
+   * look right in, since it is what an iOS 26 Liquid Glass app puts on screen.
+   */
+  tabBar?: boolean;
   /** Opens the `<Modal>` demo on launch. */
   modal?: boolean;
   /**
@@ -112,6 +128,7 @@ export default function App({
   glassRadius,
   panel,
   shaped,
+  tabBar,
   modal,
   modalPartial,
   blurTargetId,
@@ -124,6 +141,8 @@ export default function App({
   const [alwaysOn, setAlwaysOn] = useState(false);
   const [glass, setGlass] = useState(panel ?? false);
   const [shapedOpen, setShapedOpen] = useState(shaped ?? false);
+  const [tabBarOpen, setTabBarOpen] = useState(tabBar ?? false);
+  const [tab, setTab] = useState(0);
   const [modalOpen, setModalOpen] = useState(modal ?? false);
   const [blurMode, setBlurMode] = useState<BlurMode>(
     initialBlurMode ?? 'snapshot'
@@ -163,6 +182,9 @@ export default function App({
                 { backgroundColor: PALETTE[index % PALETTE.length] },
               ]}
             >
+              <Text style={styles.tileGlyph}>
+                {GLYPHS[index % GLYPHS.length]}
+              </Text>
               <Text style={styles.tileLabel}>{index}</Text>
             </View>
           )}
@@ -189,6 +211,11 @@ export default function App({
             selected={glass}
             onPress={() => setGlass((value) => !value)}
           />
+          <Button
+            label={tabBarOpen ? 'Hide tab bar' : 'Tab bar'}
+            selected={tabBarOpen}
+            onPress={() => setTabBarOpen((value) => !value)}
+          />
           <Button label="Modal" onPress={() => setModalOpen(true)} />
         </Section>
 
@@ -211,6 +238,14 @@ export default function App({
                 onPress={() => setBlurStyle(style)}
               />
             ))}
+            {/* Only `glass` changes anything on iOS: the system Liquid Glass. */}
+            <Button
+              label={blurMode === 'glass' ? 'Liquid Glass on' : 'Liquid Glass'}
+              selected={blurMode === 'glass'}
+              onPress={() =>
+                setBlurMode((value) => (value === 'glass' ? 'snapshot' : 'glass'))
+              }
+            />
           </Section>
         ) : (
           <Section title="Blur settings (Android)">
@@ -226,9 +261,14 @@ export default function App({
             />
             <Button
               label={`blurMode ${blurMode}`}
-              selected={blurMode === 'live'}
+              selected={blurMode !== 'snapshot'}
               onPress={() =>
-                setBlurMode((value) => (value === 'live' ? 'snapshot' : 'live'))
+                setBlurMode(
+                  (value) =>
+                    BLUR_MODES[
+                      (BLUR_MODES.indexOf(value) + 1) % BLUR_MODES.length
+                    ] ?? 'snapshot'
+                )
               }
             />
             <Button
@@ -342,7 +382,42 @@ export default function App({
         </Text>
       </BlurOverlay>
 
-      {/* 5. Inside a <Modal />, which on Android is a window of its own.
+      {/* 5. A floating capsule tab bar, the shape Liquid Glass is built for.
+              `glass` refracts the content just outside the capsule into its
+              rim; the capsule is a uniform borderRadius, which is all a live
+              blur can clip to. */}
+      <BlurOverlay
+        visible={tabBarOpen}
+        blurStyle="systemThinMaterial"
+        blurMode={blurMode}
+        blurTargetId={blurTargetId}
+        maxUpdateFps={maxUpdateFps}
+        radius={glassRadius ?? TAB_BAR_RADIUS}
+        downsampling={2}
+        brightness={-10}
+        // A blur washes colour out; iOS materials put it back at about this.
+        saturation={1.8}
+        fadeDuration={220}
+        style={styles.tabBar}
+      >
+        <View style={styles.tabRow}>
+          {TABS.map((label, index) => (
+            <Pressable
+              key={label}
+              onPress={() => setTab(index)}
+              style={[styles.tab, index === tab && styles.tabSelected]}
+            >
+              <Text
+                style={[styles.tabText, index === tab && styles.tabTextOn]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </BlurOverlay>
+
+      {/* 6. Inside a <Modal />, which on Android is a window of its own.
               Nothing can capture the app behind another window, so with
               `blurMode="live"` the overlay asks the system to blur behind the
               whole modal window instead — live, and composited for free. Where
@@ -516,6 +591,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   tileLabel: { color: 'white', fontSize: 11, fontWeight: '600' },
+  tileGlyph: { color: 'rgba(255,255,255,0.9)', fontSize: 26, lineHeight: 30 },
   section: { gap: 8 },
   sectionTitle: {
     color: '#9fb3c8',
@@ -581,6 +657,30 @@ const styles = StyleSheet.create({
     // Clips the blurred surface into the panel's shape.
     overflow: 'hidden',
   },
+  tabBar: {
+    top: 'auto',
+    left: 24,
+    right: 24,
+    bottom: 72,
+    height: 64,
+    borderRadius: 32,
+    // Hairline only: on glass the lens draws the lit rim itself.
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+  },
+  tabRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 },
+  tab: {
+    flex: 1,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabSelected: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  tabText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600' },
+  tabTextOn: { color: '#fff' },
   shaped: {
     top: 'auto',
     left: 20,
