@@ -10,12 +10,12 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
 | 0 — Feasibility spike | **passed** (2026-09-16) | variant A fails structurally → we need a `<BlurTarget>`. Budget met on device: 15ms P90 / 0% jank at 60Hz, inputScale 0.5, Galaxy A22 (API 33, Helio G80). Re-record 0.2–0.4ms across two SoCs. 120Hz and the Fabric overhead remain untested. |
 | 1 — Live blur core (API 31+) | **passed** (2026-09-17) | `<BlurTarget>` + `blurMode="live"` shipped. Measured in `example/` on the A22: 14ms P90 / 0.5% jank at 60Hz, 1.5% at 90Hz — level with the snapshot. `downsampling` 2 and `maxUpdateFps` 30 are both load-bearing defaults. 120Hz still untested. |
 | 2 — Modal / window blur | **passed** (2026-09-17) | `blurMode="live"` in a `<Modal>` blurs behind the window through `FLAG_BLUR_BEHIND` — *not* `Window.setBackgroundBlurRadius`, which needs a `Window` no public View API reaches; see RESULTS.md. Happy path on the API 37 emulator, degradation on the A22, plus the runtime toggle and the partial-coverage refusal. No physical device supporting cross-window blur has ever run it. |
-| 3 — Fallbacks, props, docs | ready | still owes the `setBackground()`/`borderRadius` fix — Phase 1 got half of it |
+| 3 — Fallbacks, props, docs | **passed** (2026-09-26) | `setBackground()` gone from both paths, so `borderRadius`/`borderWidth`/`backgroundColor` work — which needed the manager to apply the border props itself, because RN hands a custom manager none of them. `snapshotUpdateFps` added, gated on the screen actually drawing. Live blur unchanged at 14ms P90. Docs rewritten for three paths. **Owes a consolidated sweep on the final build.** |
 | 4 — SDK 37.2 fast path | optional, any time | needs a capture-only mode to split re-record from blur; the library has none |
-| 5 — Release 3.1.0 | blocked on 3 | |
-| 6 — Glass edge refraction | sketched, not scheduled | prototyped **and measured** 2026-09-16: works, and affordable at inputScale 0.5 (collapses at 1.0 — 100% jank at 90Hz). Not in 3.1.0. **Phase 1 delivered the outset-capable capture rect it asked for** (`captureOutset`). |
+| 5 — Release 3.1.0 | ready | must start with the consolidated 60/90Hz sweep Phase 3 deferred |
+| 6 — Glass edge refraction | **unblocked**, not scheduled | prototyped **and measured** 2026-09-16: works, and affordable at inputScale 0.5 (collapses at 1.0 — 100% jank at 90Hz). Not in 3.1.0. Both things it waited on now exist: `captureOutset` from Phase 1 and the corner radius from Phase 3. The project owner's own app uses iOS 26 Liquid Glass and wants the Android equivalent, so this is the phase that matters to them. |
 
-## Still owed after Phase 2
+## Still owed after Phase 3
 
 - **120Hz.** Still nothing. The best panel available remains the Galaxy A22's 90Hz, where
   everything passed. Inherited by whichever phase gets a 120Hz device.
@@ -36,6 +36,21 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
   masked to a shape instead, and React Native's `ExtraWindowEventListener` is the public
   way to the `Window` it needs — available once this package's `react-native >= 0.80`
   floor moves past it.
+- **A consolidated frame sweep on the final 3.1.0 build**, 60Hz and 90Hz. Phase 3 changed
+  the blur path after measuring it and deliberately did not re-measure; the numbers in
+  RESULTS.md describe the pre-gate build. **Phase 5 starts here.**
+- **An API 24–30 device has never run the periodic re-blur**, which is what it exists for.
+  The A70 (API 30) was not available in the Phase 3 session.
+- **`saturation`.** A blur averages, so it desaturates; iOS materials add a ~1.8x boost to
+  compensate and we expose no equivalent. The single biggest reason an Android panel looks
+  flat beside the iOS one. One `ColorMatrix.setSaturation()` composed into the matrices both
+  capture paths already build, inert on the window-blur path. Specified in Phase 3, built by
+  nobody.
+- **"Blur degree changes in random spots" during a fling.** Reported by eye, never
+  reproduced — a screenshot burst came back byte-identical and caught nothing. Needs
+  `ffmpeg` and frame-by-frame inspection; the machine does not have it installed.
+- **Per-corner radii on a live blur.** A RenderNode outline can only be a uniform round
+  rect, so `borderTopLeftRadius` and friends shape a snapshot and not a live blur.
 
 Hardware available to this project, none of it permanently attached — ask before assuming:
 
@@ -77,6 +92,13 @@ is trying to see. Phase 0 tried and threw the numbers away.
   code compiles and nothing more.
 - **Measure before claiming.** No "should be fast" in commit messages or docs — numbers
   or nothing. Record them in RESULTS.md.
+- **Measure settled code, once.** A sweep is ~25 minutes and any change to the blur path
+  voids it, so measuring *during* implementation means measuring again after the next edit.
+  Learned the expensive way in Phase 3: three sweeps were thrown away in one session, two
+  of them because the code changed under them. While building, verify on device
+  *functionally* — the `BlurOverlay` debug counters say whether a path is doing what it
+  should — and save the frame sweep for the point where the code has stopped moving. Any
+  numbers recorded against code that later changed must say so.
 - **Both architectures.** Native changes must build under Fabric *and* the legacy
   architecture (the iOS sources are `#ifdef RCT_NEW_ARCH_ENABLED`; Android's manager
   implements the Codegen interface and keeps `@ReactProp` annotations).
@@ -98,6 +120,7 @@ is trying to see. Phase 0 tried and threw the numbers away.
 | `docs/live-blur/spike/` | Phase 0's standalone harness — plain Views, no RN. Re-run it for the 120Hz number, or as the plain-View control when measuring what Fabric costs |
 | `docs/live-blur/example-sweep.sh` | Phase 1's sweep of the example app. Variants come from launch-intent extras, so nothing depends on tapping buttons |
 | `android/.../WindowBlur.java` | Phase 2's Dialog/`<Modal>` path: `FLAG_BLUR_BEHIND` on the host window's layout params, and the reasons it declines |
+| `docs/live-blur/phase3-sweep.sh` | Phase 3's sweep — the periodic re-blur's cost, and a regression check on Phase 1's default. Has the `SHUFFLE=1` the Phase 1 anomalies asked for |
 
 ### How the Android capture works today
 
@@ -153,6 +176,15 @@ adb shell dumpsys gfxinfo com.bluroverlayexample | sed -n '/Janky frames/,/99th/
 
 Or, for the example app, `HZ=60 REPS=3 SERIAL=<serial> ./docs/live-blur/example-sweep.sh`,
 which does all of the above per variant. `ONLY=<variant>` restricts it to one.
+`phase3-sweep.sh` is the same harness with Phase 3's variants and a `SHUFFLE=1`
+that randomises variant order within a repetition.
+
+**Two things about `example-sweep.sh` that Phase 3 had to fix in its own copy**,
+and which anyone reusing the older script should know: `adb shell` reads stdin,
+so a `while read` loop feeding it swallows the rest of the variant list; and
+`settings get` prints `null` for a setting that was never written, which the
+restore step then writes back as the literal string `null` rather than unsetting
+it. The phones are borrowed — `settings delete` is the correct restore.
 
 Use Macrobenchmark instead when a phase needs numbers precise enough to publish.
 
@@ -262,6 +294,11 @@ is a scrim rather than a colour-matrix offset. The README says nothing about any
 yet — Phase 2 documented it only in the JSDoc. That is Phase 3's to write up, and the
 cost model it owes is now three paths, not two.
 ```
+
+### Phase 6 note
+
+Phase 6's prompt below still says "Do not start this before Phase 3". Phase 3 is done, so
+that line is now satisfied rather than blocking.
 
 ### Phase 4
 

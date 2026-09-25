@@ -4,6 +4,7 @@ import {
   Easing,
   FlatList,
   Modal,
+  PixelRatio,
   Platform,
   Pressable,
   StatusBar,
@@ -45,7 +46,28 @@ const PALETTE = [
 // interesting while something is moving behind it.
 const TILES = Array.from({ length: 400 }, (_, index) => `tile-${index}`);
 
+// `radius` is in physical pixels, so the same number is a different amount of
+// blur on every screen — 20 is a soft haze at density 1 and almost nothing at
+// density 3. Asking for it in dp is what makes the panel look the same on every
+// phone, and like the iOS material next to it.
+const GLASS_DP = 40;
+const GLASS_RADIUS = Math.round(PixelRatio.get() * GLASS_DP);
+
+// Deliberately 4 rather than the library's live default of 2, so that `live`
+// and `snapshot` show the *same* amount of blur and the demo compares like with
+// like. The snapshot path runs StackBlur, which clamps at a radius of 25 after
+// downsampling, so a snapshot saturates at `radius = 25 * downsampling` while a
+// live blur has no such ceiling. At downsampling 4 that ceiling is 100, which is
+// above the radius above; at 2 it would be 50, and toggling blurMode would
+// visibly change how blurred the panel is.
+const GLASS_DOWNSAMPLING = 4;
+
 const UPDATE_RATES = [30, 60, 0];
+
+// Off, then the rate Phase 3 measured as affordable and judged by eye as the
+// point where a periodic re-blur stops looking like a slideshow. 5 and 15 both
+// read as broken; 30 does not.
+const SNAPSHOT_RATES = [0, 30];
 
 /**
  * Initial props, which on Android come from the launch intent's extras — see
@@ -57,6 +79,16 @@ interface LaunchProps {
   maxUpdateFps?: number;
   downsampling?: number;
   panel?: boolean;
+  /**
+   * Shows the shaped panel: an overlay whose own `borderRadius`, `borderWidth`
+   * and `backgroundColor` shape the blur, with no clipping parent. Before 3.1
+   * none of the three did anything on Android.
+   */
+  shaped?: boolean;
+  /** Retakes the snapshot blur this many times a second. `0` freezes it. */
+  snapshotUpdateFps?: number;
+  /** Blur radius for the glass panel, in physical pixels. */
+  glassRadius?: number;
   /** Opens the `<Modal>` demo on launch. */
   modal?: boolean;
   /**
@@ -76,21 +108,30 @@ export default function App({
   blurMode: initialBlurMode,
   maxUpdateFps: initialMaxUpdateFps,
   downsampling: initialDownsampling,
+  snapshotUpdateFps: initialSnapshotUpdateFps,
+  glassRadius,
   panel,
+  shaped,
   modal,
   modalPartial,
   blurTargetId,
 }: LaunchProps) {
   const [blurStyle, setBlurStyle] = useState<BlurStyle>('dark');
   const [radius, setRadius] = useState(14);
-  const [downsampling, setDownsampling] = useState(initialDownsampling ?? 2);
+  const [downsampling, setDownsampling] = useState(
+    initialDownsampling ?? GLASS_DOWNSAMPLING
+  );
   const [alwaysOn, setAlwaysOn] = useState(false);
   const [glass, setGlass] = useState(panel ?? false);
+  const [shapedOpen, setShapedOpen] = useState(shaped ?? false);
   const [modalOpen, setModalOpen] = useState(modal ?? false);
   const [blurMode, setBlurMode] = useState<BlurMode>(
     initialBlurMode ?? 'snapshot'
   );
   const [maxUpdateFps, setMaxUpdateFps] = useState(initialMaxUpdateFps ?? 30);
+  const [snapshotUpdateFps, setSnapshotUpdateFps] = useState(
+    initialSnapshotUpdateFps ?? 0
+  );
 
   const menu = useRef<BlurOverlayInstance>(null);
 
@@ -218,6 +259,7 @@ export default function App({
         blurStyle={blurStyle}
         radius={radius}
         downsampling={downsampling}
+        snapshotUpdateFps={snapshotUpdateFps}
         brightness={-120}
         fadeDuration={250}
         onPress={() => closeOverlay()}
@@ -256,11 +298,12 @@ export default function App({
           blurMode={blurMode}
           blurTargetId={blurTargetId}
           maxUpdateFps={maxUpdateFps}
-          radius={20}
+          radius={glassRadius ?? GLASS_RADIUS}
           downsampling={downsampling}
           // Gives the blur real pixels to sample past the panel's edge instead
           // of clamping the last row.
           captureOutset={20}
+          snapshotUpdateFps={snapshotUpdateFps}
           brightness={-16}
           fadeDuration={220}
         >
@@ -274,7 +317,32 @@ export default function App({
         </BlurOverlay>
       </View>
 
-      {/* 4. Inside a <Modal />, which on Android is a window of its own.
+      {/* 4. The blur takes the overlay's own shape. `borderRadius`,
+              `borderWidth` and `backgroundColor` are set on the overlay itself
+              and there is no clipping parent anywhere — before 3.1 the Android
+              blur was the view's background drawable, so setting any of the
+              three replaced it and did nothing. */}
+      <BlurOverlay
+        visible={shapedOpen}
+        blurStyle="systemThinMaterial"
+        blurMode={blurMode}
+        blurTargetId={blurTargetId}
+        maxUpdateFps={maxUpdateFps}
+        snapshotUpdateFps={snapshotUpdateFps}
+        radius={glassRadius ?? GLASS_RADIUS}
+        downsampling={downsampling}
+        captureOutset={20}
+        brightness={-16}
+        fadeDuration={220}
+        style={styles.shaped}
+      >
+        <Text style={styles.glassTitle}>Shaped by its own style</Text>
+        <Text style={styles.glassText}>
+          borderRadius, borderWidth and backgroundColor, on the overlay.
+        </Text>
+      </BlurOverlay>
+
+      {/* 5. Inside a <Modal />, which on Android is a window of its own.
               Nothing can capture the app behind another window, so with
               `blurMode="live"` the overlay asks the system to blur behind the
               whole modal window instead — live, and composited for free. Where
@@ -292,6 +360,7 @@ export default function App({
           blurMode={blurMode}
           radius={radius}
           downsampling={downsampling}
+          snapshotUpdateFps={snapshotUpdateFps}
           brightness={-40}
           fadeDuration={0}
           onPress={() => setModalOpen(false)}
@@ -309,7 +378,7 @@ export default function App({
         </BlurOverlay>
       </Modal>
 
-      {/* 5. Fully declarative. */}
+      {/* 6. Fully declarative. */}
       <BlurOverlay
         visible={alwaysOn}
         blurStyle={blurStyle}
@@ -511,6 +580,22 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     // Clips the blurred surface into the panel's shape.
     overflow: 'hidden',
+  },
+  shaped: {
+    top: 'auto',
+    left: 20,
+    right: 20,
+    bottom: 250,
+    height: 150,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.45)',
+    // Tints the blur rather than hiding it: React Native draws this over the
+    // blurred backdrop, not instead of it.
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    justifyContent: 'center',
+    padding: 22,
+    gap: 8,
   },
   glassInner: {
     width: '100%',

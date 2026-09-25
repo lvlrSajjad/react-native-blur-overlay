@@ -16,12 +16,14 @@ A native blur overlay for React Native: it blurs whatever is rendered behind it 
 <sub>The <a href="./example">example app</a> on the New Architecture. The first two are <strong>the same glass panel, same code</strong>, on iOS and Android; then a full-screen overlay on each.</sub>
 
 - **Frosted-glass panels on both platforms** — the same code that gives you a `UIVisualEffectView` material on iOS gives you a matching glass panel on Android
+- **[Live blur on Android 12+](#live-blur-on-android)** — content scrolling behind the glass stays blurred, as it always has on iOS
+- **[Blur behind a `<Modal>`](#blur-behind-a-modal)**, which no capture-based library on Android can reach
 - Works on the **New Architecture** (Fabric, via Codegen) and on the legacy architecture
 - TypeScript types included
 - Autolinked — no Podfile or `MainApplication` edits
 - No third-party dependencies
 
-> **3.0 is a maintenance release** that rewrites both native sides and the JS API. See [Migrating from 2.x](#migrating-from-2x).
+> **3.1 is additive.** Live blur is opt-in and `snapshot` stays the default, so an app upgrading from 3.0 sees no change until it asks for one. Coming from 2.x, see [Migrating from 2.x](#migrating-from-2x).
 
 ## Requirements
 
@@ -29,7 +31,7 @@ A native blur overlay for React Native: it blurs whatever is rendered behind it 
 | --- | --- |
 | React Native | >= 0.80 (New Architecture and legacy both supported) |
 | iOS | 15.1+ |
-| Android | minSdk 24+ · live blur needs API 31+ (Android 12) |
+| Android | minSdk 24+ · live blur needs API 31+ (Android 12), and degrades to a snapshot below it |
 
 For older React Native versions use `react-native-blur-overlay@2`.
 
@@ -131,13 +133,14 @@ When `visible` is set, the imperative API is ignored for that overlay.
 | --- | --- | --- | --- | --- |
 | `visible` | `boolean` | — | both | Controls the overlay declaratively. When set, the imperative API is ignored. |
 | `id` | `string` | `'default'` | both | Id used by `openOverlay(id)` / `closeOverlay(id)`. |
-| `radius` | `number` | `20` | Android | Blur radius. Effective radius is `radius / downsampling`, capped at 25. |
+| `radius` | `number` | `20` | Android | Blur radius, in **physical pixels** — see [choosing a radius](#choosing-a-radius). |
 | `downsampling` | `number` | `1`, or `2` when `blurMode="live"` | Android | How much the capture is scaled down before blurring. Higher is faster and coarser. |
 | `brightness` | `number` | `0` | Android | Brightness offset, `-255`..`255`. Negative darkens. |
-| `blurMode` | `'snapshot' \| 'live'` | `'snapshot'` | Android | `live` re-blurs a [`<BlurTarget>`](#live-blur-on-android) as it draws. Needs API 31+ and a target; falls back to `snapshot` without either. |
+| `blurMode` | `'snapshot' \| 'live'` | `'snapshot'` | Android | `live` re-blurs a [`<BlurTarget>`](#live-blur-on-android) as it draws, or — [inside a `<Modal>`](#blur-behind-a-modal) — asks the system to blur behind the modal's window. Falls back to `snapshot` wherever it cannot do either. |
 | `blurTargetId` | `string` | `'default'` | Android | Which `<BlurTarget>` a live overlay captures. |
 | `maxUpdateFps` | `number` | `30` | Android | Upper bound on live re-blurs per second. `0` means every drawn frame. |
 | `captureOutset` | `number` | `0` | Android | How far past the overlay's edges a live capture reaches, in `radius` pixels. Removes the clamped edge a blur leaves at its border. |
+| `snapshotUpdateFps` | `number` | `0` | Android | Retakes the `snapshot` blur this many times a second. `0` takes it once and freezes it. The [only way to get a moving backdrop below Android 12](#coarse-updates-below-android-12). |
 | `blurStyle` | `BlurStyle` | `'light'` | iOS | Which `UIBlurEffectStyle` to use, see below. |
 | `vibrant` | `boolean` | `false` | iOS | Renders the children inside a `UIVibrancyEffect` view. |
 | `fadeDuration` | `number` | `500` | both | Fade in/out duration in ms. `0` disables the animation. |
@@ -181,17 +184,23 @@ import BlurOverlay, {
 
 **iOS** uses a `UIVisualEffectView`, so the blur is live: whatever moves behind the overlay stays blurred while it moves.
 
-**Android** has no equivalent system view, so the library does the work itself — one of two ways, chosen with `blurMode`.
+**Android** has no equivalent system view, so the library does the work itself. There are three ways it can get a backdrop, and which one you get depends on `blurMode` and on where the overlay is mounted:
 
-**`blurMode="snapshot"` (the default)** draws the screen behind the overlay into a bitmap when the overlay appears, blurs it off the main thread and sets it as the overlay's background. The blur is a **still image**: content that animates behind the overlay is not re-blurred, and you refresh it by closing and re-opening the overlay. It costs nothing per frame, works down to API 24, and is what every 3.0 app already gets.
+| | What it does | Needs | Costs |
+| --- | --- | --- | --- |
+| **`snapshot`** (default) | Draws the screen behind the overlay into a bitmap once, blurs it off the main thread, and holds it. A **still image** — content that moves behind the overlay is not re-blurred. | API 24 | Nothing per frame. One software capture plus one Stack Blur each time it is taken. |
+| **`live`**, in the app's window | Re-records a [`<BlurTarget>`](#live-blur-on-android) subtree into a `RenderNode` as it draws and hands it to the RenderThread with a blur `RenderEffect`. Content moving behind the overlay stays blurred, as on iOS. | API 31+ and a `<BlurTarget>` | One re-record and one GPU blur per *drawn* frame, capped by `maxUpdateFps`. Nothing at all on a still screen. [Measured below.](#what-live-blur-costs) |
+| **`live`**, inside a [`<Modal>`](#blur-behind-a-modal) | Asks the system to blur behind the modal's whole window. A modal is its own Android window and no capture can reach across one, so this is the only way. | API 31+, cross-window blur enabled, and an overlay covering the modal | Nothing — SurfaceFlinger composites it. |
 
-**`blurMode="live"`** re-records a [`<BlurTarget>`](#live-blur-on-android) subtree into a `RenderNode` as it draws and hands it to the RenderThread with a blur `RenderEffect`. Content moving behind the overlay stays blurred, as it does on iOS. It needs API 31+ (`RenderEffect`) and a `<BlurTarget>`; without either the overlay silently falls back to a snapshot, so it is safe to set unconditionally.
+Each one falls back to the one above it, so `blurMode="live"` is safe to set unconditionally: below API 31, without a `<BlurTarget>`, or where cross-window blur is off, the overlay quietly shows a snapshot instead. It says which reason applied in logcat, once, under the `BlurOverlay` tag.
 
-Both modes share these:
+`snapshotUpdateFps` is the fourth option, and the only one available below Android 12: it [retakes the snapshot on a timer](#coarse-updates-below-android-12) rather than freezing it.
+
+These hold for every mode:
 
 - The capture is cropped to the overlay's position on screen, so an overlay that covers part of the screen blurs exactly that part.
-- The blur is drawn under the overlay's own content, which means `borderRadius`, `borderWidth` and `backgroundColor` on the overlay itself have no effect on Android — wrap the overlay in a rounded, `overflow: 'hidden'` parent instead.
-- `SurfaceView`-backed content — video players, camera previews, maps — cannot be captured by either mode and comes out blank.
+- The blur is drawn **under** everything React Native draws for the overlay, so `borderRadius`, `borderWidth` and `backgroundColor` on the overlay itself all work: the radius shapes the blur, a translucent `backgroundColor` tints it, and the border frames it. (Before 3.1 the blur *was* the overlay's background drawable, so setting any of those three replaced it and did nothing.) One limit: a **live** blur can only be clipped to a uniform corner radius — per-corner radii like `borderTopLeftRadius` shape a snapshot but leave a live blur square.
+- `SurfaceView`-backed content — video players, camera previews, maps — cannot be captured and comes out blank. The window blur inside a `<Modal>` is the exception, since the system composites it rather than us.
 
 Blurring a snapshot used to be done with RenderScript, which Android deprecated in Android 12 and no longer ships to new builds. 3.0 replaces it with a Stack Blur implementation that works on every supported API level; live blur uses the platform's own `RenderEffect` instead and never touches Stack Blur.
 
@@ -244,22 +253,33 @@ const styles = StyleSheet.create({
 
 Two things to know:
 
-- **Put the rounding on the parent.** On Android the blurred snapshot is drawn
-  as the overlay's background, so `borderRadius`, `borderWidth` and
-  `backgroundColor` set on the overlay itself are not applied there — a
-  rounded, `overflow: 'hidden'` parent clips it on both platforms instead.
+- **A rounded, `overflow: 'hidden'` parent is what shapes the glass on both
+  platforms**, and is what the snippet above uses. On **Android** you no longer
+  need it: since 3.1 a `borderRadius`, `borderWidth` or `backgroundColor` set on
+  the overlay itself shapes, frames and tints the blur directly, where up to 3.0
+  all three were ignored — the blur *was* the view's background drawable and
+  replaced them. On iOS the blur is a `UIVisualEffectView` *inside* the
+  overlay, so a radius on the overlay does not clip it and the parent is still
+  the portable answer.
 - **On Android the glass is a still image by default** of what was behind the
   panel when it appeared (see [How it works](#how-it-works-per-platform)), so it
   suits panels that appear over settled content — sheets, dialogs, menus.
   Content scrolling behind an already-visible panel will not re-blur. On iOS the
   same panel is live; on Android 12+ you can make it live too, with
-  [`blurMode="live"`](#live-blur-on-android).
+  [`blurMode="live"`](#live-blur-on-android), and below that you can at least
+  [update it coarsely](#coarse-updates-below-android-12).
 
 ### Live blur on Android
 
 On iOS the overlay is a `UIVisualEffectView` and has always re-blurred whatever
 moves behind it. On Android 12+ (API 31), `blurMode="live"` does the same — a
 list can scroll behind a frosted panel and stay blurred.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-live-blur.gif" width="260" alt="Android: a list scrolling behind a frosted panel, which stays blurred as it moves">
+</p>
+
+<sub>The <a href="./example">example app</a> on a Galaxy A22 — 2021 low-end hardware — with <code>blurMode="live"</code> at its defaults.</sub>
 
 It needs to know **what** to blur. An overlay cannot blur a subtree it is part
 of, so wrap the content that should show through the glass in a `<BlurTarget>`
@@ -274,11 +294,9 @@ import BlurOverlay, { BlurTarget } from 'react-native-blur-overlay';
   </BlurTarget>
 
   {/* A sibling of the target, not a child. */}
-  <View pointerEvents="box-none" style={styles.clip}>
-    <BlurOverlay visible blurMode="live" radius={20} captureOutset={20}>
-      <View style={styles.panel}>{/* ... */}</View>
-    </BlurOverlay>
-  </View>
+  <BlurOverlay visible blurMode="live" radius={20} captureOutset={20} style={styles.panel}>
+    {/* ... */}
+  </BlurOverlay>
 </View>
 ```
 
@@ -293,9 +311,11 @@ blanks the overlay or makes the platform drop the backdrop entirely, with
 nothing in the logs. The library checks for it and falls back to a snapshot with
 a warning instead of showing you the failure.
 
-**What it costs.** Per drawn frame: one re-record of the target, one
-`RenderEffect` blur on the RenderThread. Nothing at all on a still screen — the
-work is tied to frames actually being drawn.
+#### What live blur costs
+
+Per drawn frame: one re-record of the target, one `RenderEffect` blur on the
+RenderThread. Nothing at all on a still screen — the work is tied to frames
+actually being drawn.
 
 Measured in the example app — a 400-cell `FlatList` scrolling behind a
 full-width frosted panel — on a Galaxy A22 (Android 13, Helio G80 / Mali-G52,
@@ -323,9 +343,74 @@ Three knobs bound it:
   clamps at the edge of what it can see, which smears the first pixels inside
   the border; roughly a `radius` of outset replaces that with real content.
 
-**It does not reach outside the window.** An overlay inside an RN `<Modal>` is
-in a separate Android window and cannot capture the app behind it — with or
-without live blur.
+### Blur behind a `<Modal>`
+
+An RN `<Modal>` is a **separate Android window**, and no capture technique can
+reach the app behind another window. That is a hard wall for every
+capture-based blur library on Android.
+
+`blurMode="live"` gets past it by not capturing at all: inside a modal it asks
+the system to blur behind the modal's window, which SurfaceFlinger composites
+for free. No `<BlurTarget>` is needed and there is no per-frame cost of ours.
+
+```tsx
+<Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+  <BlurOverlay visible blurMode="live" radius={14} brightness={-40} fadeDuration={0}>
+    <View style={styles.card}>{/* ... */}</View>
+  </BlurOverlay>
+</Modal>
+```
+
+What changes on this path, because nothing is being captured:
+
+- `downsampling`, `maxUpdateFps`, `captureOutset` and `blurTargetId` are inert.
+  `radius` applies unchanged.
+- `brightness` becomes a scrim over the blur rather than a shift of its pixels,
+  since the compositor owns them. Equal-looking at the tints an overlay actually
+  uses, and it degrades sensibly at the extremes.
+- The blur reaches under the status and navigation bars, which a snapshot does
+  not — a snapshot captures the activity's content view.
+- **The overlay has to cover the modal.** A window blur cannot be scoped to part
+  of a window, so an overlay that covers only part of one is refused rather than
+  blurring pixels you did not ask for. It falls back to a snapshot of its own
+  bounds.
+
+It is the system's to give, and it declines in three ways — some GPUs never
+support cross-window blur, battery saver turns it off everywhere, and the
+overlay may not cover the modal. All three fall back to `snapshot`, which still
+shows the app behind the modal, frozen, and each logs its own reason.
+
+### Coarse updates below Android 12
+
+`blurMode="live"` needs API 31. Below that, `snapshotUpdateFps` retakes the
+snapshot on a timer instead of freezing it:
+
+```tsx
+<BlurOverlay visible snapshotUpdateFps={30} downsampling={4} radius={80} />
+```
+
+**Use 30.** Lower rates do not look like a slower blur, they look like a
+slideshow: the backdrop sits frozen and then jumps. At 5 retakes a second it is
+frozen for 200ms at a time and at 15 for 66ms, and both read as broken. At 30 it
+reads as a blur following the content — but it is *not* invisible, and someone
+watching for it will still see the backdrop trail the scroll slightly. That is
+the honest ceiling of this path: it is the coarse fallback, and it stays coarse.
+Where `blurMode="live"` is available, use that instead — a live blur at the same
+30fps cap has no perceptible trail at all, because it re-records the subtree on
+the GPU rather than recapturing the screen.
+
+At `downsampling={4}` it measured **13ms P90 / 0.17% janky on a Galaxy A22 —
+the same as a screen with no overlay on it at all**, and within 2ms of that
+baseline at every rate and downsampling tested. For a full-screen software
+capture plus a Stack Blur, thirty times a second, on 2021 low-end hardware.
+So the rate is not what you need to economise on; `downsampling` is — keep it at
+3–4 here, where a single frozen snapshot can afford 1.
+
+It is still **off by default**, because a frozen snapshot is what every 3.0 app
+already gets and turning this on for them would be a behaviour change. It
+applies wherever a snapshot is what you are getting, including as the fallback
+under a `blurMode="live"` that could not run, so setting both gives you live
+blur where it exists and a coarse-but-moving backdrop where it does not.
 
 ### Blur only part of the screen
 
@@ -352,9 +437,56 @@ blurred:
 
 This is the default: presses that land on the children are left to the children, and only presses on the backdrop call `onPress`. Note that a plain `View` does not capture touches in React Native — the library wraps your children in a touch-claiming view sized to them. Pass `closeOnChildPress` if you want every press to call `onPress`.
 
+### Choosing a radius
+
+`radius` is in **physical pixels**, not dp, so the same number is a different
+amount of blur on every screen: `20` is a soft haze on a density-1 phone and
+close to invisible on a density-3 one. Scale it if you want the panel to look
+the same everywhere, and to match the iOS material beside it:
+
+```tsx
+import { PixelRatio } from 'react-native';
+
+const RADIUS = Math.round(PixelRatio.get() * 20); // ~20dp of blur on any screen
+```
+
+The default stays at `20` because changing it would silently restyle every app
+that already ships this library, but on a modern phone it is almost certainly
+lower than you want. The example app scales it, and 30–40dp is where a panel
+starts reading as frosted glass rather than as a tint.
+
+There is one ceiling worth knowing about, and the two Android paths do not share
+it:
+
+- **`snapshot`** runs Stack Blur, which clamps its radius at 25 *after*
+  downsampling. So a snapshot saturates at `radius = 25 × downsampling` — `50`
+  at the default `downsampling={2}` — and gets no blurrier above that.
+- **`live`** uses the platform's `RenderEffect` and has no such cap.
+
+Above that ceiling the two modes stop showing the same amount of blur, which is
+visible if you toggle `blurMode` at runtime. Raising `downsampling` raises the
+ceiling and costs less, so it is usually the better lever: `downsampling={4}`
+puts the ceiling at `100`.
+
+**`radius` and `downsampling` interact, and it shows.** A downscaled capture is
+upscaled again after blurring, and a large blur leaves no fine detail to hide
+the interpolation — so the same `downsampling={2}` that is invisible at
+`radius={20}` starts looking coarse and banded from about `radius={80}` up. If a
+big blur looks low-quality rather than soft, that is the downscale showing
+through, and the fix is a *lower* `downsampling`, which costs more. On the live
+path the radius itself is close to free — `radius={160}` measured 15ms P90
+against 14ms for `radius={20}`, eight times the blur for one millisecond — so
+quality, not frame time, is what bounds how large you go.
+
+A blur is also an **average**, so a larger radius desaturates: mixed colours
+pull toward grey. iOS materials compensate with a saturation boost, and this
+library has no equivalent knob yet, so a big Android blur looks flatter than the
+iOS panel beside it. `brightness` cannot fix that — it shifts luminance, not
+saturation.
+
 ### Make it faster
 
-Blurring a full-screen snapshot costs the most on Android. Raise `downsampling` (2–4 is a good range) — the snapshot is scaled down before blurring, and the effective radius is adjusted so the result looks the same.
+Blurring a full-screen snapshot costs the most on Android. Raise `downsampling` (2–4 is a good range) — the capture is scaled down before blurring, and the effective radius is adjusted so the result looks about the same. It is the knob that matters on every path that captures: live blur defaults to `2` for exactly this reason, and a periodic re-blur wants at least that.
 
 ## Troubleshooting
 
@@ -362,7 +494,11 @@ Blurring a full-screen snapshot costs the most on Android. Raise `downsampling` 
 
 **The Android blur shows a stale screen.** 3.0 takes the snapshot when the overlay is mounted, so opening it right after a navigation transition can still catch the tail of the animation. Delay the `openOverlay()` call until the transition has settled.
 
-**The blur is transparent/black on Android.** `view.draw()` cannot capture hardware surfaces — video players, camera previews, maps and other `SurfaceView`-based content come out blank. That is a platform limitation of snapshot-based blurring.
+**The blur is transparent/black on Android.** `view.draw()` cannot capture hardware surfaces — video players, camera previews, maps and other `SurfaceView`-based content come out blank. That is a platform limitation of capture-based blurring, and it applies to `snapshot` and in-window `live` alike. The window blur inside a [`<Modal>`](#blur-behind-a-modal) is the one path that is not affected.
+
+**`blurMode="live"` is not live.** It falls back to `snapshot` rather than failing, and it says why in logcat under the `BlurOverlay` tag — `adb logcat -s BlurOverlay`. The usual reasons: the device is below Android 12; there is no `<BlurTarget>` in the same window as the overlay (a `<Modal>` is its own window, so a target outside it does not count); the overlay is *inside* the target, which cannot work; or, in a modal, cross-window blur is off or the overlay does not cover the window.
+
+**`borderRadius` shapes the blur, except per-corner.** A uniform `borderRadius` works on every path. Per-corner radii — `borderTopLeftRadius` and friends — shape a snapshot but leave a **live** blur square, because a live blur is clipped by a `RenderNode` outline and Android only lets those be a rectangle, circle or uniform round rect. Wrap the overlay in a rounded, `overflow: 'hidden'` parent if you need that shape live.
 
 ## Migrating from 2.x
 
@@ -376,8 +512,9 @@ Blurring a full-screen snapshot costs the most on Android. Raise `downsampling` 
 ## Example app
 
 The repo ships a small app that exercises every prop — imperative and
-declarative opening, the iOS blur styles, the Android radius/downsampling, a
-partial-screen overlay and press handling:
+declarative opening, the iOS blur styles, the Android radius/downsampling, live
+blur behind a scrolling list, a blurred `<Modal>`, a panel shaped by its own
+`borderRadius`, a partial-screen overlay and press handling:
 
 ```bash
 npm install
@@ -390,11 +527,17 @@ TypeScript sources, so editing `src/` refreshes the app without a rebuild.
 
 ## Roadmap
 
-Live blur on Android landed for 3.1.0 as `blurMode="live"`. Still to come in that
-release: blur behind an RN `<Modal>` (a separate window, which no capture-based
-library can reach today), a coarse periodic re-blur for API 24–30, and making
-`borderRadius` work on the Android overlay itself. The constraints, the research
-and the phased plan are in [docs/live-blur/PLAN.md](docs/live-blur/PLAN.md).
+3.1.0 brings live blur on Android: [`blurMode="live"`](#live-blur-on-android)
+for a panel in your own window, [the system's window blur behind a
+`<Modal>`](#blur-behind-a-modal), [coarse periodic updates](#coarse-updates-below-android-12)
+below Android 12, and `borderRadius` / `borderWidth` / `backgroundColor` finally
+working on the Android overlay itself.
+
+Sketched but not scheduled: a glass-edge refraction effect, and the
+`RenderNode.setBackdropRenderEffect` fast path that arrives with Android's SDK
+37.2. The constraints, the research, the measurements and the phased plan are in
+[docs/live-blur/PLAN.md](docs/live-blur/PLAN.md) and
+[RESULTS.md](docs/live-blur/RESULTS.md).
 
 ## Contributing
 

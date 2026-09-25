@@ -38,6 +38,11 @@ export interface NativeProps extends ViewProps {
    */
   captureOutset?: CodegenTypes.WithDefault<CodegenTypes.Float, 0>;
   /**
+   * How often a `"snapshot"` blur is retaken, per second. `0` takes it once and
+   * leaves it frozen, which is what every 3.0 app gets. Android only.
+   */
+  snapshotUpdateFps?: CodegenTypes.WithDefault<CodegenTypes.Int32, 0>;
+  /**
    * `UIBlurEffectStyle` to use. iOS only.
    */
   blurStyle?: CodegenTypes.WithDefault<string, 'light'>;

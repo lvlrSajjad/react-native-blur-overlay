@@ -49,6 +49,8 @@ export type BlurStyle =
  *
  * - `snapshot` blurs the screen once, when the overlay appears, and leaves it
  *   frozen. Costs nothing per frame. The default, and all 3.0 could do.
+ *   `snapshotUpdateFps` can have it retaken on a timer instead, which is the
+ *   only way to get a moving backdrop below Android 12.
  * - `live` re-blurs a `<BlurTarget>` as it draws, so content moving behind the
  *   overlay stays blurred. Needs Android 12 (API 31) and a `<BlurTarget>`;
  *   without either it falls back to `snapshot`.
@@ -122,7 +124,17 @@ export interface BlurOverlayProps {
    */
   idBlur?: string;
   /**
-   * Blur radius. Android only (on iOS the radius is fixed by `blurStyle`).
+   * Blur radius, in **physical pixels**. Android only (on iOS the radius is
+   * fixed by `blurStyle`).
+   *
+   * Pixels, not dp, so the same number is a different amount of blur on every
+   * screen — wrap it in `PixelRatio.get() * n` for a density-independent one.
+   * The default is low on a modern phone and stays where it is only because
+   * changing it would restyle every app already using the library.
+   *
+   * A `snapshot` saturates at `25 * downsampling`, because Stack Blur clamps
+   * there; a `live` blur has no ceiling. Above that the two modes stop
+   * matching.
    *
    * @default 20
    */
@@ -186,6 +198,24 @@ export interface BlurOverlayProps {
    * @default 0
    */
   captureOutset?: number;
+  /**
+   * How often the `snapshot` blur is retaken, per second. `0` takes it once,
+   * when the overlay appears, and leaves it frozen.
+   *
+   * This is the coarse fallback for Android 11 and older, where `blurMode`
+   * `live` is unavailable.
+   *
+   * **Use 30 if you use it at all.** Lower rates do not read as a slower blur,
+   * they read as a slideshow — frozen, then a jump. Measured at about 2ms of
+   * P90 over baseline at `downsampling` 4 on a Galaxy A22, so the rate is not
+   * the thing to economise on; `downsampling` is.
+   *
+   * Ignored while a live blur or a window blur owns the backdrop, since neither
+   * is a snapshot. Android only.
+   *
+   * @default 0
+   */
+  snapshotUpdateFps?: number;
   /**
    * Which `UIBlurEffectStyle` to use. iOS only.
    *
@@ -264,6 +294,7 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
       blurTargetId = DEFAULT_ID,
       maxUpdateFps = 30,
       captureOutset = 0,
+      snapshotUpdateFps = 0,
       blurStyle = 'light',
       vibrant = false,
       fadeDuration,
@@ -381,6 +412,19 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
       };
     }, []);
 
+    useEffect(() => {
+      if (__DEV__ && snapshotUpdateFps > 0 && snapshotUpdateFps < 20) {
+        console.warn(
+          `[react-native-blur-overlay] snapshotUpdateFps={${snapshotUpdateFps}} ` +
+            'will look like a slideshow rather than a blur: the backdrop stays ' +
+            `frozen for ${Math.round(1000 / snapshotUpdateFps)}ms at a time and ` +
+            'then jumps. 30 is the lowest rate that reads as following the ' +
+            'content, and it measured no more expensive than a still screen on ' +
+            'low-end hardware — raise `downsampling` rather than lowering this.'
+        );
+      }
+    }, [snapshotUpdateFps]);
+
     const openFromRef = useCallback(() => {
       if (isControlled) {
         warnIgnored('open');
@@ -422,6 +466,7 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
           blurTargetId={blurTargetId}
           maxUpdateFps={maxUpdateFps}
           captureOutset={captureOutset}
+          snapshotUpdateFps={snapshotUpdateFps}
           blurStyle={blurStyle}
           vibrant={vibrant}
           style={[styles.fill, customStyles, style]}

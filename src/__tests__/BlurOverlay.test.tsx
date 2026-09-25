@@ -255,6 +255,22 @@ describe('live blur', () => {
     expect(overlayProps()).toMatchObject({
       blurMode: 'snapshot',
       blurTargetId: 'default',
+      // A snapshot is frozen unless it is explicitly asked not to be, which is
+      // what every 3.0 app already gets.
+      snapshotUpdateFps: 0,
+    });
+  });
+
+  it('passes a periodic re-blur through to the native view', () => {
+    render(
+      <BlurOverlay visible fadeDuration={0} snapshotUpdateFps={15}>
+        {children}
+      </BlurOverlay>
+    );
+
+    expect(overlayProps()).toMatchObject({
+      blurMode: 'snapshot',
+      snapshotUpdateFps: 15,
     });
   });
 

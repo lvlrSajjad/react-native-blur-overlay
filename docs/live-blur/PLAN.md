@@ -1,10 +1,11 @@
 # Live backdrop blur on Android — plan
 
-**Status:** Phase 2 **passed** — an overlay inside a `<Modal>` now blurs the app behind it
-live, through the system's own cross-window blur, and falls back to the snapshot wherever
-that is unavailable. Phase 1's in-window live blur measured 14ms P90 / 0.5% jank at 60Hz
-on a Galaxy A22, level with the snapshot it replaces · **Target release:** 3.1.0
-(additive, opt-in) · **Last updated:** 2026-09-17
+**Status:** Phase 3 **passed** — the Android overlay's own `borderRadius`, `borderWidth`
+and `backgroundColor` now shape, frame and tint the blur; `snapshotUpdateFps` gives API
+24–30 a backdrop that follows content; the README documents all three blur paths. Live
+blur is unchanged at 14ms P90 / 0.17% jank at 60Hz on a Galaxy A22. Phase 5 is next and
+**must begin with the consolidated sweep Phase 3 deferred** · **Target release:** 3.1.0
+(additive, opt-in) · **Last updated:** 2026-09-26
 
 ## The problem
 
@@ -190,6 +191,18 @@ the whole window.
 - If not already done in Phase 1, fix the Android background/border limitation.
 - Example app: a demo that makes the difference obvious (list scrolling behind glass).
 
+**Met 2026-09-26**, with two corrections to the scope above.
+
+**The rate was wrong.** "15–20fps" assumed a periodic re-blur would be expensive enough to
+want running slowly. It is not: at `downsampling` 4 it measures level with a screen that
+has no overlay on it, and 15fps *looks* broken — a frozen backdrop that jumps, not a blur
+that follows. The prop is `snapshotUpdateFps`, it is still off by default, and the
+documented recommendation is 30.
+
+**The background fix was two fixes.** Not touching `setBackground()` is necessary but not
+sufficient: React Native never delivers `borderRadius`, `borderWidth` or `borderColor` to a
+custom view manager, so the overlay has to ask for them itself. See RESULTS.md.
+
 ### Phase 4 — SDK 37.2 fast path
 
 **Scope:** use `RenderNode.setBackdropRenderEffect` when available — it needs no
@@ -267,12 +280,17 @@ iOS-breaking bugs that compile checks did not catch.
 
 - Does self-exclusion survive hardware display-list capture? (Phase 0)
 - What does an RN Fabric hierarchy add to the per-frame cost over plain Views? (Phase 0)
-- Is the cadence cap visually acceptable at 30fps? At 20? (Phase 1 measured it as free at
-  60Hz and necessary at 90Hz, but did not judge it by eye; the bound is one cap interval,
-  so up to 33ms of staleness.)
-- ~~Can the blur be drawn without `setBackground()`~~ — half answered in Phase 1: the live
-  path draws in `onDraw()` and never touches `setBackground()`, but it does not clip to
-  RN's outline, so `borderRadius` on the overlay is still square. Phase 3.
+- ~~Is the cadence cap visually acceptable at 30fps?~~ **Answered in Phase 3, by eye**: on
+  a live blur, `maxUpdateFps` 30 has no perceptible trail — judged against an uncapped
+  build on the same phone, by someone who was not told which was which. The same 30/s on
+  the *periodic snapshot* path does trail slightly, so the cap is not the thing that shows;
+  the capture mechanism is. 20 was never tested and no longer looks worth testing.
+- ~~Can the blur be drawn without `setBackground()`~~ — **done in Phase 3.** Both paths draw
+  in `draw()` before `super.draw()`, so React Native's own background drawable survives and
+  `borderRadius` / `borderWidth` / `backgroundColor` all work on the overlay. Two things had
+  to be discovered to get there, both in RESULTS.md: React Native does not hand the border
+  props to a custom view manager at all, and HWUI silently drops a `drawRenderNode` recorded
+  under a non-rectangular canvas clip.
 - Why is full-resolution live blur ruinous at 60Hz and fine at 90Hz on the A22? GPU DVFS
   is the hypothesis; nothing tested it. (RESULTS.md, Phase 1 anomalies.)
 - ~~What does the glass edge cost on a real API 33 GPU?~~ Measured 2026-09-16: fine at

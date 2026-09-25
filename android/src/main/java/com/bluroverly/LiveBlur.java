@@ -3,6 +3,7 @@ package com.bluroverly;
 import android.graphics.Canvas;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Outline;
 import android.graphics.RecordingCanvas;
 import android.graphics.RenderEffect;
 import android.graphics.RenderNode;
@@ -26,6 +27,29 @@ import androidx.annotation.RequiresApi;
 final class LiveBlur {
 
   private final RenderNode captureNode = new RenderNode("react-native-blur-overlay");
+
+  /**
+   * Holds the capture node, clipped to the overlay's rounded shape.
+   *
+   * <p>It exists because a {@code clipPath} on the canvas does not work here:
+   * HWUI silently drops a {@code drawRenderNode} recorded under a
+   * non-rectangular clip — the blur simply does not appear, with nothing in the
+   * logs. The snapshot path, which draws a bitmap, survives the same clip. So
+   * the rounding is carried as this node's own outline instead, which HWUI
+   * applies on the RenderThread.
+   *
+   * <p>It wraps the capture node rather than clipping it directly so that the
+   * corner is cut at the overlay's resolution and not at the downsampled one.
+   * Re-recorded only when the shape changes: a node that references another
+   * node follows that node's re-records on its own.
+   */
+  private final RenderNode clipNode = new RenderNode("react-native-blur-overlay/clip");
+
+  private final Outline outline = new Outline();
+
+  private int clipWidth = -1;
+  private int clipHeight = -1;
+  private float clipRadius = -1f;
 
   /**
    * Constructing a RenderEffect is not free and the object is immutable, so it
@@ -88,23 +112,58 @@ final class LiveBlur {
     return true;
   }
 
-  /** @return whether anything was drawn. */
-  boolean draw(Canvas canvas, int width, int height) {
+  /**
+   * @param radius the overlay's corner radius in pixels, or 0 for a square one
+   * @return whether anything was drawn
+   */
+  boolean draw(Canvas canvas, int width, int height, float radius) {
     if (!(canvas instanceof RecordingCanvas) || !captureNode.hasDisplayList()) {
       return false;
     }
 
-    // An outset capture node is wider than the overlay, and a parent that does
-    // not clip its children would happily let it spill out.
-    canvas.save();
-    canvas.clipRect(0, 0, width, height);
-    ((RecordingCanvas) canvas).drawRenderNode(captureNode);
-    canvas.restore();
+    if (width != clipWidth
+        || height != clipHeight
+        || radius != clipRadius
+        || !clipNode.hasDisplayList()) {
+      // An outset capture node is wider than the overlay; a RenderNode clips to
+      // its own bounds, so positioning this one at the overlay's size is what
+      // keeps the bleed from spilling out.
+      clipNode.setPosition(0, 0, width, height);
+
+      if (radius > 0f) {
+        outline.setRoundRect(0, 0, width, height, radius);
+        clipNode.setOutline(outline);
+        clipNode.setClipToOutline(true);
+      } else {
+        clipNode.setOutline(null);
+        clipNode.setClipToOutline(false);
+      }
+
+      final RecordingCanvas recording = clipNode.beginRecording(width, height);
+
+      try {
+        recording.drawRenderNode(captureNode);
+      } finally {
+        clipNode.endRecording();
+      }
+
+      clipWidth = width;
+      clipHeight = height;
+      clipRadius = radius;
+    }
+
+    ((RecordingCanvas) canvas).drawRenderNode(clipNode);
 
     return true;
   }
 
   void release() {
+    clipNode.discardDisplayList();
+    clipNode.setOutline(null);
+    clipNode.setClipToOutline(false);
+    clipWidth = -1;
+    clipHeight = -1;
+    clipRadius = -1f;
     captureNode.discardDisplayList();
     captureNode.setRenderEffect(null);
     effect = null;

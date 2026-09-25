@@ -697,3 +697,193 @@ distinguishable in logs from the others.
 - **iOS.** Untouched by this phase. An overlay inside an RN `<Modal>` on iOS is a
   `UIVisualEffectView` in the modal's own view hierarchy and is already live.
 - **120Hz.** Unchanged from Phases 0 and 1: still nothing.
+
+## Phase 3 — fallbacks, prop surface, docs — 2026-09-26
+
+Three things shipped: the `setBackground()` fix that Phases 1 and 6 both wanted,
+the periodic re-blur for API 24–30, and the documentation of a prop surface that
+is now three paths wide. Two of them turned out to need something nobody had
+written down.
+
+### React Native does not give a custom view manager the border props
+
+Not touching `setBackground()` is necessary and not sufficient. With the blur
+moved out of the background drawable, `borderRadius` still did nothing — the
+overlay's outline came back with `radius=0.0` and logcat carried one line:
+
+```
+W ReactNative: SajjadBlurOverlay doesn't support property 'borderRadius'
+```
+
+`BaseViewManager.setBorderRadius` is **a no-op whose entire body logs that
+warning**. React Native implements the border props in `ReactViewManager`, which
+serves `<View>` and nothing else; `borderWidth` and `borderColor` do not even
+warn, they are dropped in silence. Verified against the 0.87 classes and the
+0.80 ones this package floors at.
+
+What made it fixable: on the new architecture the Codegen delegate is handed
+**every** style prop on the view, not only the declared ones. Logging them
+showed `borderRadius = 28.0`, `borderWidth = 2.0`, `borderColor = 1.946157055E9`
+all arriving and all being discarded. So `SajjadBlurOverlayManager` now
+intercepts them in its delegate and applies them through
+`BackgroundStyleApplicator` — the same API `ReactViewManager` uses — with
+`@ReactPropGroup` methods covering the legacy architecture. The overlay ends up
+with the same `CompositeBackgroundDrawable` a `<View>` would have.
+
+### HWUI silently drops `drawRenderNode` under a non-rectangular clip
+
+With the border props landing, the snapshot path rounded correctly and **the
+live path went blank**. Not blurred-but-square: gone, with nothing in logcat.
+
+The cause: `BackgroundStyleApplicator.clipToPaddingBox` takes a `clipPath`
+branch as soon as the view has rounded borders, and a `drawRenderNode` recorded
+under a non-rectangular clip is discarded. Measured on the panel interior
+(lower is blurrier):
+
+| | sharpness |
+| --- | --- |
+| no overlay | 2.56 |
+| `snapshot` under the same path clip | 0.94 |
+| `live` under the same path clip | 2.29 — i.e. not drawing |
+| `live` with the clip moved onto the node | 1.03 |
+
+A bitmap draw survives the clip; a RenderNode reference does not. So `LiveBlur`
+carries the rounding as its own `RenderNode` outline instead, on a wrapper node
+sized to the overlay so the corner is cut at full resolution rather than at the
+downsampled one. **Consequence worth knowing:** a RenderNode outline can only be
+a rectangle, circle or *uniform* round rect, so per-corner radii shape a
+snapshot and leave a live blur square. Documented rather than worked around.
+
+### The periodic re-blur is far cheaper than the plan assumed
+
+PLAN.md specified "optional periodic re-blur (15–20fps) … off by default", on the
+assumption that a full-screen software capture plus a Stack Blur is expensive
+enough to want running slowly. It is not.
+
+60Hz, Galaxy A22, release build, medians of 3, baseline interleaved 27 times.
+**These numbers describe the build as first implemented, before the still-screen
+gate below was added** — see the note at the end.
+
+| variant | p50 | P90 | janky |
+| --- | --- | --- | --- |
+| `off` — baseline | 8ms | 13ms | 0.17% |
+| `snapshot` | 10ms | 14ms | 0.17% |
+| `live` ds2 / 30fps — Phase 1's default | 12ms | 14ms | 0.17% |
+| `reblur` 5/s ds2 | 10ms | 13ms | 0.17% |
+| `reblur` 15/s ds2 | 10ms | 15ms | 0.34% |
+| `reblur` 15/s ds4 | 10ms | 14ms | 0.17% |
+| **`reblur` 30/s ds4** | 10ms | **13ms** | **0.17%** |
+| `live` ds2 / 30fps, radius 80 | 11ms | 15ms | 0.17% |
+| `live` ds2 / 30fps, radius 160 | 11ms | 15ms | 0.35% |
+
+Raw rows: [`evidence/phase3-60hz.tsv`](./evidence/phase3-60hz.tsv).
+
+**The re-blur at 30/s and downsampling 4 is level with a screen that has no
+overlay on it.** So the rate is not the thing to economise on, and the plan's
+15–20 was pessimistic in the direction that also happens to look worst.
+
+**No regression from the draw-path change.** Live blur at Phase 1's defaults
+measures 14ms P90 / 0.17% against Phase 1's 14ms / 0.52% — identical, with less
+jank. Moving both paths out of `setBackground()` and routing the live one
+through a clipped wrapper node cost nothing.
+
+**`radius` is nearly free on the live path.** Eight times the default costs 1–2ms
+P90. Nothing before this phase had measured it; Phases 0, 1 and 2 all held it at
+20. What bounds a large radius is quality, not frame time — see below.
+
+### What a human eye said, which none of the above could
+
+The numbers say every configuration above is fine. They are not. The project
+owner watched the sweep without being told which variant was on screen, three
+times through, and the verdicts were consistent across all three repetitions:
+
+| variant | verdict, ×3 |
+| --- | --- |
+| `reblur` 5/s | "lags heavily" |
+| `reblur` 15/s | "lags" |
+| `reblur` 30/s | "much better", then more precisely "barely lags" |
+| `snapshot` | "frozen" — which it is, by definition |
+| `live` radius 20 | "barely blur" |
+| `live` radius 80 / 160 | "low quality", "washed out" |
+
+Four findings come out of that, none of which a frame counter could produce:
+
+1. **A periodic re-blur below ~30/s reads as a slideshow, not as a slow blur.**
+   Frozen then jumping. 15 — the plan's own number — is in the broken range.
+   `snapshotUpdateFps` keeps taking any number, since no API 24–30 device has
+   ever run this and a weak one may need the escape hatch, but the docs
+   recommend 30 and a `__DEV__` warning fires below 20.
+2. **The 30fps cadence cap is visually free on the live path.** Judged against an
+   uncapped build on the same phone: no perceptible trail. This closes the
+   question Phase 1 left open. Note the asymmetry — the *same* 30/s on the
+   periodic snapshot path does trail slightly, so it is the capture mechanism
+   that shows, not the cadence.
+3. **`radius` defaults to 20 physical pixels, which is ~10dp on a modern phone
+   and barely a blur.** It is in pixels, not dp. The default cannot move without
+   restyling every existing app, so it stays and the docs now say to scale it by
+   `PixelRatio.get()`.
+4. **A blur is an average, so a big blur desaturates** — "washed out" got worse
+   as the radius grew. iOS materials compensate with a ~1.8× saturation boost
+   and this library has no equivalent knob; `brightness` shifts luminance, not
+   saturation. A `saturation` prop is the obvious answer and is *not* in this
+   phase.
+
+Also from the same session, and unresolved: the backdrop reportedly shows
+"blur degree changing in random spots" during a fling. Never reproduced — two
+attempts to capture it failed, one because a screenshot burst returned
+byte-identical frames. Open.
+
+### The still-screen gate, added after the numbers above
+
+The periodic re-blur as first written had no change detection: at 30/s it
+recaptured and re-blurred the whole screen thirty times a second whether or not
+anything had moved. The live path has had a gate since Phase 1; this one did not.
+
+It now shares the pre-draw listener, skips the capture when nothing has drawn,
+and reuses the previous snapshot's bitmap through a two-buffer swap rather than
+allocating one per retake. Verified with the debug counter
+(`setprop log.tag.BlurOverlay DEBUG`) rather than a sweep:
+
+| | captures |
+| --- | --- |
+| 8s still, ungated | 240 (by construction) |
+| 8s still, gated | **10**, then **6** on a repeat |
+| 4s scrolling, gated | 108 — the ~30/s asked for |
+
+**A still screen went from full price to about 4%.** The residual is not
+explained: it should be zero, and something in the window draws roughly once a
+second. Small, recorded, not chased.
+
+**The table above therefore measures the pre-gate build.** The gate only removes
+work on a still screen — during a scroll the gate is a no-op, since something
+draws every frame — so the scrolling numbers should carry over, but that is an
+argument, not a measurement. A consolidated 60Hz and 90Hz sweep on the final code
+is owed before 3.1.0 ships.
+
+### Decisions
+
+- **The blur draws in `draw()` before `super.draw()`**, so React Native's
+  background drawable survives it and paints on top: a translucent
+  `backgroundColor` tints the blur, a border frames it.
+- **The overlay applies its own border props**, because nothing else will.
+- **The live path clips with a RenderNode outline, the snapshot path with a
+  canvas path.** Forced by HWUI, and it is why per-corner radii work on one and
+  not the other.
+- **`snapshotUpdateFps` stays a number and stays off by default**, with 30
+  documented and anything below 20 warned about in development.
+- **Measurement moves to settled code.** Three sweeps were discarded in one
+  session, two because the code changed under them. See the ground rule in
+  HANDOFF.md.
+
+### Still open after Phase 3
+
+- **A consolidated sweep on the final build**, 60Hz and 90Hz. Owed before release.
+- **90Hz for Phase 3's variants.** Started, then abandoned as stale when the gate
+  landed. Nothing recorded.
+- **No API 24–30 device has run the periodic re-blur**, which is the feature's
+  actual target. The A70 (API 30) was not available; everything here is the same
+  code measured on API 33.
+- **The residual captures on a still screen.**
+- **The "random spots" instability.** Unreproduced.
+- **Saturation.** The gap to an iOS material is a saturation boost we do not have.
+- **120Hz.** Unchanged since Phase 0.
