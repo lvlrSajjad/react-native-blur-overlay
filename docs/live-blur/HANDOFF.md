@@ -3,6 +3,20 @@
 One phase per session. Start a new session, paste that phase's prompt, work, then update
 [RESULTS.md](./RESULTS.md) and the status line in [PLAN.md](./PLAN.md) before finishing.
 
+## Pick up here (as of 2026-09-26, end of day)
+
+Phase 6 session 1 is done and **committed on branch `live-blur/phase6-glass`** (`6bcf570`,
+`4416d94`). It is not pushed and not merged to `master`. `blurMode="glass"` works on both
+platforms and the owner is happy with the look. Next session, in order:
+
+1. **The frame sweep** (Phase 6 session 2 prompt below). The owner deferred it; it takes
+   ~25–35 minutes. Before starting, ask how the A22 should stay awake: it locked itself
+   mid-recording once. Either the owner sets a 30-minute screen timeout, or, with their OK,
+   turn on the "stay awake while charging" dev option and turn it off afterwards.
+2. **The example app's UIScene adoption.** It crashes at launch on iOS 27. Example-only; a
+   separate task was already offered for it.
+3. **Merge the branch**, then **Phase 5** → 3.1.0.
+
 ## Status
 
 | Phase | State | Session notes |
@@ -12,8 +26,8 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
 | 2 — Modal / window blur | **passed** (2026-09-17) | `blurMode="live"` in a `<Modal>` blurs behind the window through `FLAG_BLUR_BEHIND` — *not* `Window.setBackgroundBlurRadius`, which needs a `Window` no public View API reaches; see RESULTS.md. Happy path on the API 37 emulator, degradation on the A22, plus the runtime toggle and the partial-coverage refusal. No physical device supporting cross-window blur has ever run it. |
 | 3 — Fallbacks, props, docs | **passed** (2026-09-26) | `setBackground()` gone from both paths, so `borderRadius`/`borderWidth`/`backgroundColor` work — which needed the manager to apply the border props itself, because RN hands a custom manager none of them. `snapshotUpdateFps` added, gated on the screen actually drawing. Live blur unchanged at 14ms P90. Docs rewritten for three paths. **Owes a consolidated sweep on the final build.** |
 | 4 — SDK 37.2 fast path | optional, any time | needs a capture-only mode to split re-record from blur; the library has none |
-| 5 — Release 3.1.0 | ready | must start with the consolidated 60/90Hz sweep Phase 3 deferred |
-| 6 — Glass edge refraction | **in progress** | 2026-09-26, session 1: `blurMode="glass"` and `saturation` built. The Android lens is a port of Kyant0/AndroidLiquidGlass (Apache-2.0) and QWEA0/Liquid-Glass-Android (MIT), chained after the live blur. The owner called it "quite liquidy" on the A22. iOS uses the system `UIGlassEffect` on 26+, shaped via `cornerConfiguration`, and was checked running on an iOS 26.5 simulator. Pills now clip on every live path. **Owed before release:** frame numbers on settled code and the example app's UIScene adoption (it crashes on iOS 27). See RESULTS.md "Phase 6 — first session". |
+| 5 — Release 3.1.0 | blocked on Phase 6 | must start with the consolidated 60/90Hz sweep Phase 3 deferred. Phase 6 session 2 can serve as that sweep if it covers snapshot, live and glass on the final build. Now also owes README coverage of `glass` and `saturation`. |
+| 6 — Glass edge refraction | **in progress**: looks done, unmeasured | 2026-09-26, session 1, on branch `live-blur/phase6-glass`: `blurMode="glass"` and `saturation` built. The Android lens is a port of Kyant0/AndroidLiquidGlass (Apache-2.0) and QWEA0/Liquid-Glass-Android (MIT), one AGSL pass chained after the live blur. The owner called it "quite liquidy" on the A22, then had the rim light tightened. iOS uses the system `UIGlassEffect` on 26+, shaped via `cornerConfiguration`, and was checked running on an iOS 26.5 simulator. Pills now clip on every live path, on both platforms. **Owed:** frame numbers on this code (session 2), and the example app's UIScene adoption (it crashes on iOS 27). See RESULTS.md "Phase 6 — first session". |
 
 ## Still owed after Phase 3
 
@@ -41,11 +55,8 @@ One phase per session. Start a new session, paste that phase's prompt, work, the
   RESULTS.md describe the pre-gate build. **Phase 5 starts here.**
 - **An API 24–30 device has never run the periodic re-blur**, which is what it exists for.
   The A70 (API 30) was not available in the Phase 3 session.
-- **`saturation`.** A blur averages, so it desaturates; iOS materials add a ~1.8x boost to
-  compensate and we expose no equivalent. The single biggest reason an Android panel looks
-  flat beside the iOS one. One `ColorMatrix.setSaturation()` composed into the matrices both
-  capture paths already build, inert on the window-blur path. Specified in Phase 3, built by
-  nobody.
+- ~~**`saturation`.**~~ Built in Phase 6 session 1: default 1, and the demo uses 1.8. It is
+  one `ColorMatrix` shared by the snapshot and live paths, and inert on the window-blur path.
 - **"Blur degree changes in random spots" during a fling.** Reported by eye, never
   reproduced — a screenshot burst came back byte-identical and caught nothing. Needs
   `ffmpeg` and frame-by-frame inspection; the machine does not have it installed.
@@ -351,6 +362,31 @@ Measure at the end, on settled code, not while building. Verify functionally as 
 `adb shell setprop log.tag.BlurOverlay DEBUG`, and capture video rather than screenshots when
 judging motion — a screenshot burst returned byte-identical frames in Phase 3 and caught
 nothing.
+```
+
+### Phase 6, session 2: measure glass
+
+```
+Work Phase 6 of docs/live-blur/PLAN.md, session 2: measure what session 1 built. Read
+HANDOFF.md ("Pick up here") and RESULTS.md "Phase 6 — first session" first. Check out
+branch live-blur/phase6-glass; nothing on it is merged yet.
+
+The code is settled and the owner has approved the look, so do not tune the shader in this
+session. Measure it. On the Galaxy A22 (borrowed: ask first, and ask how it should stay
+awake before starting, because it locks itself mid-run), run one sweep at 60Hz and 90Hz:
+off (baseline), snapshot, live and glass, 3 repetitions each, baseline interleaved,
+refresh rate pinned and restored. Use the example app's floating tab bar
+(`--ez tabBar true --es blurMode <mode>`), release build. Randomise variant order: the
+Phase 1 anomalies had fixed order as their obvious confound.
+
+The spike measured its glass at 20ms P90 at 60Hz and 19ms at 90Hz (inputScale 0.5). The
+shipped lens should be cheaper: one pass chained after the blur, 3 taps, no extra nodes.
+Record whether it is. If glass janks at 90Hz, the levers in order are band size, the
+dispersion taps, then the resolution clamp. Record the numbers in RESULTS.md. If this sweep
+covers all three modes on the final build, it also discharges the consolidated sweep Phase 5
+is waiting for; say so in the status table.
+
+`npm run check:android`, `npm run typecheck`, `npm test` must pass. Do not release.
 ```
 
 ### Phase 5

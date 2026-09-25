@@ -1,11 +1,11 @@
 # Live backdrop blur on Android — plan
 
-**Status:** Phase 3 **passed** — the Android overlay's own `borderRadius`, `borderWidth`
-and `backgroundColor` now shape, frame and tint the blur; `snapshotUpdateFps` gives API
-24–30 a backdrop that follows content; the README documents all three blur paths. Live
-blur is unchanged at 14ms P90 / 0.17% jank at 60Hz on a Galaxy A22. Phase 5 is next and
-**must begin with the consolidated sweep Phase 3 deferred** · **Target release:** 3.1.0
-(additive, opt-in) · **Last updated:** 2026-09-26
+**Status:** Phase 6 session 1 **built, not measured**, on branch `live-blur/phase6-glass`.
+`blurMode="glass"` is the third rung. On Android 13+ it is the live blur with an AGSL lens
+ported from Kyant0/AndroidLiquidGlass and QWEA0/Liquid-Glass-Android; on iOS 26+ it is the
+system `UIGlassEffect`. `saturation` shipped alongside. Next: the Phase 6 frame sweep
+(which can double as the consolidated sweep Phase 3 deferred), then Phase 5 · **Target
+release:** 3.1.0 (additive, opt-in) · **Last updated:** 2026-09-26
 
 ## The problem
 
