@@ -26,10 +26,38 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     factory.startReactNative(
       withModuleName: "BlurOverlayExample",
       in: window,
+      initialProperties: launchProperties(),
       launchOptions: launchOptions
     )
 
     return true
+  }
+
+  /**
+   * Launch arguments as initial props, the iOS twin of MainActivity's intent
+   * extras, so a demo can open in a given state without anyone scrolling to the
+   * buttons:
+   *
+   *   xcrun simctl launch booted org.reactjs.native.example.BlurOverlayExample \
+   *     -tabBar true -blurMode glass
+   */
+  private func launchProperties() -> [AnyHashable: Any] {
+    var props: [AnyHashable: Any] = [:]
+    let args = ProcessInfo.processInfo.arguments.dropFirst()
+    var iterator = args.makeIterator()
+
+    while let key = iterator.next() {
+      guard key.hasPrefix("-"), let value = iterator.next() else { continue }
+      let name = String(key.dropFirst())
+
+      switch value {
+      case "true": props[name] = true
+      case "false": props[name] = false
+      default: props[name] = Double(value) ?? value
+      }
+    }
+
+    return props
   }
 }
 

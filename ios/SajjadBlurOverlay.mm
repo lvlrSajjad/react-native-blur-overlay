@@ -21,6 +21,13 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   BOOL _currentVibrant;
   /** `blurMode="glass"`: the system's own Liquid Glass, where there is one. */
   BOOL _currentGlass;
+  /**
+   * The overlay's uniform corner radius in points, for glass to take as its
+   * shape. Read from the props rather than the layer: with a visible border and
+   * no clipping, React Native draws the border itself and leaves
+   * `layer.cornerRadius` at 0.
+   */
+  CGFloat _glassCornerRadius;
 }
 
 #pragma mark - Lifecycle
@@ -60,13 +67,37 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   _vibrancyView.frame = self.bounds;
   _containerView.frame = self.bounds;
 
-  // Glass draws its own shape, rim and highlight, so it has to be told the
-  // overlay's corner radius rather than be clipped to it — a clip would cut
-  // the rim off. React Native puts a uniform `borderRadius` on the layer.
-  if (_currentGlass) {
-    _blurView.layer.cornerRadius = self.layer.cornerRadius;
-    _blurView.layer.cornerCurve = self.layer.cornerCurve;
+  [self applyGlassShape];
+}
+
+/**
+ * Glass draws its own shape, rim and highlight, so it has to be told the
+ * overlay's corners rather than be clipped to them: a clip would cut the rim
+ * off. A radius of half the short side or more is a capsule, which iOS 26 has
+ * its own configuration for.
+ */
+- (void)applyGlassShape
+{
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26.0, *)) {
+    if (!_currentGlass) {
+      return;
+    }
+
+    const CGSize size = self.bounds.size;
+    const CGFloat half = MIN(size.width, size.height) / 2;
+
+    if (_glassCornerRadius <= 0) {
+      _blurView.cornerConfiguration =
+          [UICornerConfiguration configurationWithUniformRadius:[UICornerRadius fixedRadius:0]];
+    } else if (_glassCornerRadius >= half - 0.5) {
+      _blurView.cornerConfiguration = [UICornerConfiguration capsuleConfiguration];
+    } else {
+      _blurView.cornerConfiguration = [UICornerConfiguration
+          configurationWithUniformRadius:[UICornerRadius fixedRadius:_glassCornerRadius]];
+    }
   }
+#endif
 }
 
 #pragma mark - Effect
@@ -203,6 +234,25 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   [super updateProps:props oldProps:oldProps];
 }
 
+- (void)finalizeUpdates:(RNComponentViewUpdateMask)updateMask
+{
+  [super finalizeUpdates:updateMask];
+
+  // Resolved the way React Native resolves it for its own border drawing, now
+  // that both the props and the layout are current. Only a uniform radius has
+  // a glass shape; per-corner radii leave it square.
+  const auto borderMetrics = _props->resolveBorderMetrics(_layoutMetrics);
+  const auto &radii = borderMetrics.borderRadii;
+  const bool uniform = radii.topLeft == radii.topRight && radii.topLeft == radii.bottomLeft &&
+      radii.topLeft == radii.bottomRight;
+  const CGFloat radius = uniform ? (CGFloat)radii.topLeft.horizontal : 0;
+
+  if (radius != _glassCornerRadius) {
+    _glassCornerRadius = radius;
+    [self setNeedsLayout];
+  }
+}
+
 - (void)mountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
 {
   [_containerView insertSubview:childComponentView atIndex:index];
@@ -220,6 +270,7 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   static const auto defaultProps = std::make_shared<const SajjadBlurOverlayProps>();
   _props = defaultProps;
 
+  _glassCornerRadius = 0;
   [self setBlurStyle:SajjadBlurOverlayDefaultStyle vibrant:NO glass:NO];
 }
 

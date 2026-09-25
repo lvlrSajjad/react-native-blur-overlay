@@ -1020,5 +1020,12 @@ Still unmeasured. Parameters are hard-coded in `LiveBlur` (`glassBand`, `glassPu
 `Glass.lens()` call sites.
 
 iOS: the example app **crashes at launch on iOS 27** (`UIApplication` requires UIScene
-lifecycle adoption). This is an example-app problem, not a library one. On iOS 26 it has not
-been seen running yet; that is waiting on simulator access.
+lifecycle adoption). This is an example-app problem, not a library one. **On an iOS 26.5
+simulator the system glass runs**: [`phase6-android-vs-ios.png`](./spike/evidence/phase6-android-vs-ios.png).
+The first run drew a *rectangle* of glass. With a visible border and no clipping, React
+Native draws the border itself and sets `layer.cornerRadius = 0`, so copying the layer's
+radius copied nothing. The radius is now resolved from the props in `finalizeUpdates:`
+(`resolveBorderMetrics`, as React Native does itself) and handed to iOS 26's
+`cornerConfiguration`, as a capsule when it is at least half the short side. The example
+app now takes launch arguments as initial props (`-tabBar true -blurMode glass`), the twin
+of Android's intent extras.
