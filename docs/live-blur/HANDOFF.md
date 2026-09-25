@@ -295,11 +295,6 @@ yet — Phase 2 documented it only in the JSDoc. That is Phase 3's to write up, 
 cost model it owes is now three paths, not two.
 ```
 
-### Phase 6 note
-
-Phase 6's prompt below still says "Do not start this before Phase 3". Phase 3 is done, so
-that line is now satisfied rather than blocking.
-
 ### Phase 4
 
 ```
@@ -319,13 +314,43 @@ Work Phase 6 of docs/live-blur/PLAN.md — the glass edge. Read PLAN.md and the 
 of RESULTS.md first; a working prototype already exists as variant G in
 docs/live-blur/spike, so start by running it rather than from scratch.
 
-Do not start this before Phase 3: it needs the setBackground() fix for the corner radius.
+Phase 3 is done, so both things this phase was waiting on now exist: the overlay's real
+corner radius (readable from its outline, see SajjadBlurOverlayView#cornerRadius) and the
+outset-capable capture rect (`captureOutset`, Phase 1).
 
 The API 33 measurement is already done and in RESULTS.md — glass holds 90fps at inputScale
 0.5 and collapses completely at 1.0, so clamp the scale rather than trusting a caller. Read
 the three corrections at the end of that section before touching the shader; two of them are
 bugs that looked like aesthetic choices, and the third is why the test backdrop needs
 --ez diag true.
+
+Ship it as `blurMode="glass"`, the third rung of the existing enum, falling back to "live"
+below API 33 and to "snapshot" below 31 — PLAN.md has the prop surface and the reason it is
+an enum rather than a boolean.
+
+What the owner actually wants, which is the acceptance test for this phase: an
+iOS-26-Liquid-Glass-style floating capsule tab bar, on Android, matching their app's iOS
+build. Shown the current live blur beside their iOS screenshot on 2026-09-26, they named
+the gap precisely — "we do have the rim shines, they look good; we don't have that subtle
+soft distortion towards the edge". So:
+
+- The refraction is the point. Blur strength is not the gap; radius was pushed from 20 to
+  320 and got no closer.
+- The rim we have is a uniform `borderWidth` ring, which they already like. iOS varies its
+  brightness around the curve. Same shader, and worth doing while you are in there.
+- A capsule needs only a uniform corner radius, which a live blur can now clip to. Per-corner
+  radii still cannot — a RenderNode outline will not take them.
+- Build the demo as a floating tab bar, not another rectangular panel. That is the shape
+  this has to look right in.
+
+Consider doing `saturation` first or alongside — it is listed under "Still owed" above, it is
+one ColorMatrix.setSaturation() in matrices both capture paths already build, and it fixes
+the "washed out" half of the gap that the shader does not.
+
+Measure at the end, on settled code, not while building. Verify functionally as you go with
+`adb shell setprop log.tag.BlurOverlay DEBUG`, and capture video rather than screenshots when
+judging motion — a screenshot burst returned byte-identical frames in Phase 3 and caught
+nothing.
 ```
 
 ### Phase 5
