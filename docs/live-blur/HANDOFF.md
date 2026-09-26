@@ -16,8 +16,9 @@ settings unset, stay-awake off, logging property cleared. Ask before assuming it
    `HZ=90 REPS=4 ./docs/live-blur/phase6-sweep.sh`. Session 2's trace says glass costs only
    ~0.4ms over live and the slow mode is the phone's, not glass's (live shows it too). See
    RESULTS.md "Tracing the slow mode". If glass stays within reach of live at 90Hz, it ships.
-   If it does not, ship it anyway with the cost documented as a limit on 90Hz low-end
-   phones? That is the owner's call, not the session's.
+   **Decided by the owner (2026-09-26): glass ships in 3.1.0 either way**, with any 90Hz
+   jank on low-end phones documented as a known limit. The sweep is for the numbers in the
+   README and CHANGELOG, not a gate.
 2. **GIFs**: Android glass tab bar (A22 `screenrecord`) and iOS 26 simulator (`simctl io
    recordVideo`). No ffmpeg on this machine: extract frames with an AVFoundation
    `AVAssetImageGenerator` Swift script, then assemble with PIL. Put them in `docs/` and at
