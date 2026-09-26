@@ -3,19 +3,32 @@
 One phase per session. Start a new session, paste that phase's prompt, work, then update
 [RESULTS.md](./RESULTS.md) and the status line in [PLAN.md](./PLAN.md) before finishing.
 
-## Pick up here (as of 2026-09-26, end of day)
+## Pick up here (as of 2026-09-26, afternoon)
 
-Phase 6 session 1 is done and **committed on branch `live-blur/phase6-glass`** (`6bcf570`,
-`4416d94`). It is not pushed and not merged to `master`. `blurMode="glass"` works on both
-platforms and the owner is happy with the look. Next session, in order:
+Phase 6 is on branch **`live-blur/phase6-glass`**, not pushed, not merged. Glass looks
+right on both platforms. Snapshot and live are cleared for 3.1.0 by the session-2 sweep.
+The owner wants 3.1.0 released **with glass**, plus GIFs showing it off.
 
-1. ~~**The frame sweep.**~~ Done in session 2. Snapshot and live are cleared. Glass is
-   bimodal: about half its runs are slow (8–14% jank at 90Hz) with flat GPU time. **Next:**
-   a `perfetto` trace of one slow and one fast glass run to find the CPU-side cost. The
-   A22 did not lock during sweeps: the swipes count as user activity.
-2. **The example app's UIScene adoption.** It crashes at launch on iOS 27. Example-only; a
-   separate task was already offered for it.
-3. **Merge the branch**, then **Phase 5** → 3.1.0.
+The A22 went back to its owner mid-sweep. It was left as found: app uninstalled, refresh
+settings unset, stay-awake off, logging property cleared. Ask before assuming it is back.
+
+1. **Finish the 90Hz glass sweep** (and 60Hz) with the 8dp capture margin removed:
+   `HZ=90 REPS=4 ./docs/live-blur/phase6-sweep.sh`. Session 2's trace says glass costs only
+   ~0.4ms over live and the slow mode is the phone's, not glass's (live shows it too). See
+   RESULTS.md "Tracing the slow mode". If glass stays within reach of live at 90Hz, it ships.
+   If it does not, ship it anyway with the cost documented as a limit on 90Hz low-end
+   phones? That is the owner's call, not the session's.
+2. **GIFs**: Android glass tab bar (A22 `screenrecord`) and iOS 26 simulator (`simctl io
+   recordVideo`). No ffmpeg on this machine: extract frames with an AVFoundation
+   `AVAssetImageGenerator` Swift script, then assemble with PIL. Put them in `docs/` and at
+   the top of the README.
+3. **README**: a Liquid Glass section, `glass` + `saturation` in the props table, a glass
+   row in "How it works", roadmap updated. **CHANGELOG** 3.1.0 is drafted; it has a
+   `GLASS_NUMBERS` placeholder to fill in from step 1.
+4. The example app's UIScene fix (iOS 27 crash) was being done in a separate session, in
+   worktree `claude/laughing-keller-df6ca2`. Merge it if it is finished.
+5. Merge the branch, bump to 3.1.0, and hand the owner the tag command. **Do not push the
+   tag yourself**: CI publishes to npm on it.
 
 ## Status
 

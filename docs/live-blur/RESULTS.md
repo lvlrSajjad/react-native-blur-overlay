@@ -1089,3 +1089,45 @@ What distinguishes a slow run. Candidates, cheapest to test first:
 
 **Decision:** glass stays out of a release until the slow mode is explained and gone at
 90Hz. Snapshot and live are cleared for 3.1.0.
+
+### Tracing the slow mode, and a margin removed
+
+`atrace` (gfx, view, sched, freq, app tags) on the A22 at 90Hz, parsed with
+[`parse-atrace.py`](./parse-atrace.py) since no perfetto trace processor is installed.
+Averages per frame on the RenderThread (tracing overhead makes most runs slow):
+
+| | Drawing | flush commands | overlay layer | runs (jank) |
+| --- | --- | --- | --- | --- |
+| off | 4.6ms | 0.7ms | none | 1.6%, 1.7% |
+| live | 5.65ms | 1.6ms | 0.64ms, 315×60 | **9.0%**, 3.0% |
+| glass (8dp margin) | 5.8–6.1ms | 1.8–2.0ms | 0.65ms, 330×75 | 1.6–15.4% over 6 runs |
+
+- **Glass costs only ~0.3–0.5ms of RenderThread time more than live.** The lens is not
+  the problem.
+- **The slow mode is not glass's.** Traced live showed it too (9.0% against 3.0%). The
+  slow runs spend longer in `dequeueBuffer`, waiting for a free buffer (1.6ms against
+  1.0ms in glass's fastest and slowest runs). That is backpressure from the GPU and
+  compositor. At 90Hz live and glass both sit at the edge of the 11.1ms budget on this
+  phone, so small state changes tip them over, and glass's extra half-millisecond tips it
+  more often.
+- **The overlay's layer re-renders on every frame**, not at `maxUpdateFps`: 854–880
+  `drawLayer` calls per ~870 frames, for live and glass alike. The capture node references
+  the target's own RenderNodes, so every scroll frame changes its content on the
+  RenderThread. That is why live blur tracks scrolling smoothly, and it means
+  `maxUpdateFps` caps UI-thread re-records, not GPU work.
+
+**The 8dp capture margin is removed.** The spike's outward lens needed it; the inward lens
+never samples outside the overlay. It made glass's layer ~30% larger than live's. Visually
+identical without it. **A re-sweep was stopped after 1.5 repetitions** (the phone went back
+to its owner):
+
+| 90Hz, no margin | P90 | Janky |
+| --- | --- | --- |
+| glass rep 1 | 18ms | **35.42%**, with the next baseline also slow: 6.60%, P50 13ms |
+| glass rep 2 | 14ms | **0.80%**, the best glass at 90Hz so far |
+| live reps 1–2 | 15ms | 1.38–1.39% |
+| baselines | 12–17ms | 0.69–6.60%, noisier than the morning's sweeps |
+
+The slow glass run and the slow baseline right after it suggest the phone's state, not the
+variant. Two runs cannot confirm that the margin removal helps. **Owed:** finish this sweep
+(4 reps at 90Hz, and 60Hz), then decide whether glass ships in 3.1.0.

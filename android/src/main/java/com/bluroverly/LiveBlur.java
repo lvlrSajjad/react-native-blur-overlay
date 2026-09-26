@@ -100,9 +100,10 @@ final class LiveBlur {
       // Measured on a Galaxy A22 at 90Hz: full resolution collapses to 100%
       // jank, half holds 90fps. Not a caller's choice to make.
       inputScale = Math.min(inputScale, GLASS_MAX_INPUT_SCALE);
-      // Samples are clamped to the capture, so a margin keeps the band from
-      // folding a clamped edge row into the border.
-      outset = Math.max(outset, glassBleed(width, height, density));
+      // No capture margin of its own: the lens only ever samples inward, and
+      // an 8dp margin made the layer HWUI re-renders every frame ~30% larger
+      // (330x75 against live's 315x60 on the demo tab bar), which is most of
+      // what glass cost over live. `captureOutset` still applies if set.
     }
 
     final int scaledWidth = Math.max(1, Math.round((width + 2f * outset) * inputScale));
@@ -170,10 +171,6 @@ final class LiveBlur {
    */
   private static float glassPull(int width, int height, float density) {
     return Math.min(glassBand(width, height, density) * 2.5f, Math.min(width, height) * 0.7f);
-  }
-
-  private static float glassBleed(int width, int height, float density) {
-    return 8f * density;
   }
 
   @RequiresApi(GLASS_SDK)

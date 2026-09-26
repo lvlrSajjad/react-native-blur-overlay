@@ -1,13 +1,66 @@
 # Changelog
 
-## Unreleased
+## 3.1.0
 
-- Documented frosted-glass panels — sizing the overlay to a rounded,
-  `overflow: 'hidden'` box gives an iOS-material-style glass surface on both
-  platforms — with a demo in the example app and screenshots from both.
-- Noted that on Android `borderRadius`, `borderWidth` and `backgroundColor`
-  set on the overlay itself are not applied, because the blurred snapshot is
-  drawn as the view's background; the rounding belongs on the parent.
+Live blur on Android, and Liquid Glass on both platforms. Everything here is
+opt-in: `snapshot` stays the default, so an app upgrading from 3.0 sees no
+change until it asks for one.
+
+### Added
+
+- **`blurMode="glass"`: Liquid Glass.** On iOS 26+ the overlay becomes the
+  system's own `UIGlassEffect`, shaped to the overlay's `borderRadius` (a
+  capsule when the radius is half the height). On Android 13+ it is the live
+  blur plus an AGSL lens: the backdrop bends and folds back on itself toward
+  the rim, with a thin, directionally lit hairline and a faint colour fringe.
+  It falls back to `live` on Android 12 and to the `blurStyle` blur below
+  iOS 26. The lens ports ideas from two open-source Android implementations:
+  Kyant0/AndroidLiquidGlass (Apache-2.0) and QWEA0/Liquid-Glass-Android (MIT).
+  Both are credited in `Glass.java`.
+- **`blurMode="live"`** on Android 12+: a `<BlurTarget>` around the content to
+  blur, re-recorded into a `RenderNode` and blurred on the RenderThread as it
+  draws, so content scrolling behind the overlay stays blurred, as on iOS.
+  `maxUpdateFps` (default 30) caps the re-blurs; `blurTargetId` picks a target;
+  `captureOutset` reaches past the overlay's edges. `downsampling` defaults to
+  2 in live mode.
+- **Blur behind a `<Modal>`**: `blurMode="live"` inside a modal asks the system
+  to blur behind the modal's window, where cross-window blur is available, and
+  falls back to a snapshot where it is not.
+- **`snapshotUpdateFps`**: retakes the snapshot on a timer, the only way to
+  get a moving backdrop below Android 12. Off by default.
+- **`saturation`** (default 1): colour saturation of the blur on Android. A
+  blur averages, so it washes colour out; iOS materials put it back at about
+  1.8, and so can you now.
+- Documented frosted-glass panels: an overlay sized to a rounded box gives an
+  iOS-material-style glass surface on both platforms, with a demo in the
+  example app and screenshots from both.
+- The example app has a floating capsule tab bar, and on both platforms it
+  takes its starting state from launch arguments (intent extras on Android,
+  `-key value` arguments on iOS).
+
+### Fixed
+
+- **`borderRadius`, `borderWidth` and `backgroundColor` now work on the Android
+  overlay itself.** The blur used to be the view's background drawable, so
+  setting any of the three replaced it. It is now drawn under what React Native
+  draws, so the radius shapes it, a translucent colour tints it and the border
+  frames it.
+- **A live blur clips to a capsule.** React Native publishes a rounded outline
+  as a path, which has no radius to read back, so a pill-shaped live overlay
+  used to stay rectangular. A uniform `borderRadius` is now read from the style.
+- Snapshot blurs no longer use RenderScript anywhere.
+
+### Performance
+
+Measured on a Galaxy A22 (Android 13, Helio G80), the weakest device we have,
+in the example app's release build:
+
+- `snapshot` and `live` cost the same as each other: live holds 60Hz with
+  under 1.3% jank, and 90Hz at 1.4-2.2% jank, level with Phase 1.
+- `glass`: GLASS_NUMBERS
+
+Per-corner radii shape a snapshot but not a live or glass blur, which can only
+be clipped to a uniform radius.
 
 ## 3.0.1
 
