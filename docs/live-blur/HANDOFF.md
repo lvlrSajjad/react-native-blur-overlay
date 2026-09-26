@@ -16,16 +16,16 @@ opened from the owner's account (`gh` under `Coding/ME` uses
 `GH_CONFIG_DIR=~/.config/gh-personal`). CI is green after an `oxfmt` fix. It is waiting for
 a maintainer.
 
-**3.2 is built on branch `glass-options-3.2`** (`22bbaba`), not merged and not released:
+**3.2.0 is prepared on local `master`** (fast-forwarded from `glass-options-3.2`):
 `glassVariant`, `glassTint`, `interactive`, `blurRadius`. It was tuned side by side on
 the iOS 26.5 simulator and the Android 17 emulator; see `docs/liquid-glass-variants.png`.
-CHANGELOG has an "Unreleased (3.2.0)" section. To release: merge, rename that section,
-bump to 3.2.0, and the owner pushes `master` and the `v3.2.0` tag.
+The version is bumped and the CHANGELOG is final. The owner pushes `master` and the `v3.2.0`
+tag; CI publishes.
 
 Open for 3.2:
-- **iOS `interactive` has not been seen responding.** It is Apple's own flag and is set,
-  but the simulator cannot hold a touch while a screenshot is taken. Check it by hand on
-  the simulator or a device.
+- ~~**iOS `interactive`.**~~ Confirmed by the owner on the iOS 26 simulator after `f05b0a9`:
+  glass passed to `UIVisualEffectView`'s initialiser never wires up its touch interaction,
+  and has to be assigned once the view is in the hierarchy.
 - A GIF of `interactive` and the variants would show them off better than the still.
 - Optional: the A22 frame sweep. The owner calls it extra information, not a gate; the
   margin-removal re-sweep and 3.2's press animation are both unmeasured. The phone is

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (3.2.0)
+## 3.2.0
 
 Glass options that exist on both platforms: each maps to a `UIGlassEffect`
 property on iOS 26 and is built to match on Android 13.
@@ -23,7 +23,8 @@ property on iOS 26 and is built to match on Android 13.
 - With `blurMode="glass"` and no radius set, the Android blur now follows
   `glassVariant` (10dp regular, 5dp clear) instead of 20 physical pixels.
 - On iOS, glass now hosts the children inside its content view, as Apple
-  intends, which is what lets `interactive` see touches.
+  intends, and is assigned to the effect view once it is on screen. Both are
+  needed for `interactive` to respond.
 
 ### Deprecated
 
