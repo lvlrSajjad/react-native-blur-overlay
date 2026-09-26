@@ -116,11 +116,18 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   [_vibrancyView removeFromSuperview];
   _vibrancyView = nil;
 
-  _blurView = [[UIVisualEffectView alloc] initWithEffect:glassEffect ?: blurEffect];
+  // Glass is assigned after the view is in the hierarchy, the order Apple's
+  // UIKit sample uses. Passed to the initialiser instead, it renders but
+  // `interactive` never responds to touch. A blur has no such constraint.
+  _blurView = [[UIVisualEffectView alloc] initWithEffect:glassEffect != nil ? nil : blurEffect];
   _blurView.frame = self.bounds;
   _blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   // Index 0 keeps the blur behind the children.
   [self insertSubview:_blurView atIndex:0];
+
+  if (glassEffect != nil) {
+    _blurView.effect = glassEffect;
+  }
 
   if (glassEffect != nil) {
     // Glass reacts to touches, and treats content for legibility, only inside
