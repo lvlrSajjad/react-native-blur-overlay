@@ -57,7 +57,7 @@ That's it — the library is autolinked. If you are upgrading from 2.x, **remove
 
 ### Expo
 
-Works in Expo apps that build their own native code — a [development build](https://docs.expo.dev/develop/development-builds/introduction/), `npx expo prebuild`, or EAS Build — on any Expo SDK that ships React Native 0.80 or newer:
+Works in Expo apps that build their own native code — a [development build](https://docs.expo.dev/develop/development-builds/introduction/), `npx expo prebuild`, or EAS Build — on **Expo SDK 54 or newer** (the first to ship React Native 0.80+; SDK 54 has 0.81). Verified on SDK 57, with `snapshot`, `live` and `glass` on iOS 26 and Android:
 
 ```bash
 npx expo install react-native-blur-overlay
