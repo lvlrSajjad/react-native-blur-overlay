@@ -21,16 +21,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeDelegate = delegate
     reactNativeFactory = factory
 
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "BlurOverlayExample",
-      in: window,
-      initialProperties: launchProperties(),
-      launchOptions: launchOptions
-    )
-
+    // The window, and React Native in it, start in SceneDelegate: iOS 27 stops
+    // at launch any app that has not adopted the UIScene lifecycle.
     return true
+  }
+
+  func application(
+    _ application: UIApplication,
+    configurationForConnecting connectingSceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let configuration = UISceneConfiguration(
+      name: "Default",
+      sessionRole: connectingSceneSession.role
+    )
+    configuration.delegateClass = SceneDelegate.self
+    return configuration
   }
 
   /**
@@ -41,7 +47,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
    *   xcrun simctl launch booted org.reactjs.native.example.BlurOverlayExample \
    *     -tabBar true -blurMode glass
    */
-  private func launchProperties() -> [AnyHashable: Any] {
+  func launchProperties() -> [AnyHashable: Any] {
     var props: [AnyHashable: Any] = [:]
     let args = ProcessInfo.processInfo.arguments.dropFirst()
     var iterator = args.makeIterator()
@@ -58,6 +64,33 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     return props
+  }
+}
+
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard
+      let windowScene = scene as? UIWindowScene,
+      let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+      let factory = appDelegate.reactNativeFactory
+    else { return }
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    appDelegate.window = window
+
+    factory.startReactNative(
+      withModuleName: "BlurOverlayExample",
+      in: window,
+      initialProperties: appDelegate.launchProperties(),
+      launchOptions: nil
+    )
   }
 }
 
