@@ -127,6 +127,11 @@ final class LiveBlur {
 
     final RenderEffect frost = effectFor(Math.max(0.5f, radius * inputScale), brightness, saturation);
 
+    if (!useGlass) {
+      // Nothing for a later restyle to put the lens back on.
+      lastFrost = null;
+    }
+
     captureNode.setRenderEffect(
         useGlass
             ? glassEffect(
@@ -173,6 +178,46 @@ final class LiveBlur {
     return Math.min(glassBand(width, height, density) * 2.5f, Math.min(width, height) * 0.7f);
   }
 
+  // The glass-only style: `glassVariant`, `glassTint` and a press, set from
+  // the view. They change far more often than a capture happens (a press
+  // animates at the frame rate), so restyle() rebuilds the effect on the last
+  // capture's geometry instead of waiting for, or forcing, a new capture.
+  private boolean glassClear;
+  private int glassTint;
+  private float glassPress;
+  private float glassTouchX;
+  private float glassTouchY;
+
+  // The last glass capture's geometry, for restyle().
+  private RenderEffect lastFrost;
+  private int lastScaledWidth;
+  private int lastScaledHeight;
+  private int lastWidth;
+  private int lastHeight;
+  private float lastOutset;
+  private float lastInputScale;
+  private float lastCorner;
+  private float lastDensity;
+
+  /**
+   * @param touchX where the finger is, in the overlay's own pixels
+   * @param touchY where the finger is, in the overlay's own pixels
+   */
+  void setGlassStyle(boolean clear, int tint, float press, float touchX, float touchY) {
+    glassClear = clear;
+    glassTint = tint;
+    glassPress = press;
+    glassTouchX = touchX;
+    glassTouchY = touchY;
+
+    if (Build.VERSION.SDK_INT >= GLASS_SDK && lastFrost != null && captureNode.hasDisplayList()) {
+      captureNode.setRenderEffect(
+          glassEffect(
+              lastFrost, lastScaledWidth, lastScaledHeight, lastWidth, lastHeight, lastOutset,
+              lastInputScale, lastCorner, lastDensity));
+    }
+  }
+
   @RequiresApi(GLASS_SDK)
   private RenderEffect glassEffect(
       RenderEffect frost,
@@ -188,6 +233,16 @@ final class LiveBlur {
       glass = new Glass();
     }
 
+    lastFrost = frost;
+    lastScaledWidth = scaledWidth;
+    lastScaledHeight = scaledHeight;
+    lastWidth = width;
+    lastHeight = height;
+    lastOutset = outset;
+    lastInputScale = inputScale;
+    lastCorner = corner;
+    lastDensity = density;
+
     final float band = glassBand(width, height, density) * inputScale;
     final RenderEffect lens =
         ((Glass) glass)
@@ -202,11 +257,21 @@ final class LiveBlur {
                 glassPull(width, height, density) * inputScale,
                 // QWEA0 defaults to 0.10 and its hero shot uses 0.16.
                 0.15f,
-                1.6f,
+                // Clear glass gets a brighter rim, as QWEA0's clear material
+                // does; its lighter blur is the JS side's, where the variant
+                // picks the default radius.
+                glassClear ? 1.9f : 1.6f,
                 // Below a capture pixel on purpose: antialiased, it reads thinner
                 // than the 1dp a whole pixel would be at half resolution.
                 0.75f * density * inputScale,
-                3f * density * inputScale);
+                3f * density * inputScale,
+                glassTint,
+                // Regular glass is milky beside iOS 26; clear is not lifted at
+                // all, and not dimmed either: iOS leaves dimming to the app.
+                glassClear ? 0f : 0.3f,
+                glassPress,
+                (glassTouchX + outset) * inputScale,
+                (glassTouchY + outset) * inputScale);
 
     // createChainEffect(outer, inner) runs inner first: blur, then the lens.
     if (glassChain == null || lens != glassChainLens || frost != glassChainFrost) {
@@ -275,6 +340,7 @@ final class LiveBlur {
     glassChain = null;
     glassChainLens = null;
     glassChainFrost = null;
+    lastFrost = null;
     effect = null;
     effectRadius = -1f;
   }

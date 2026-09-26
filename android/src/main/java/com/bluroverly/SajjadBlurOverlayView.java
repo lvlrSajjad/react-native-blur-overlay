@@ -1,5 +1,6 @@
 package com.bluroverly;
 
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
@@ -85,6 +86,16 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   private float downsampling = 1f;
   private float brightness = 0f;
   private float saturation = 1f;
+
+  // Glass-only style. Pushed to the live blur whenever it changes; a press
+  // animates at the frame rate, so none of these wait for a capture.
+  private boolean glassClear;
+  private int glassTint;
+  private boolean glassInteractive;
+  private float glassPress;
+  private float touchX;
+  private float touchY;
+  @Nullable private ValueAnimator pressAnimator;
   private String blurMode = "snapshot";
   private String blurTargetId = SajjadBlurTargetView.DEFAULT_ID;
   private int maxUpdateFps = 30;
@@ -288,6 +299,92 @@ public class SajjadBlurOverlayView extends ReactViewGroup
     }
   }
 
+  public void setGlassVariant(@Nullable String variant) {
+    final boolean clear = "clear".equals(variant);
+
+    if (glassClear != clear) {
+      glassClear = clear;
+      pushGlassStyle();
+    }
+  }
+
+  public void setGlassTint(@Nullable Integer tint) {
+    final int next = tint == null ? 0 : tint;
+
+    if (glassTint != next) {
+      glassTint = next;
+      pushGlassStyle();
+    }
+  }
+
+  public void setGlassInteractive(boolean interactive) {
+    glassInteractive = interactive;
+
+    if (!interactive) {
+      animatePress(0f);
+    }
+  }
+
+  private void pushGlassStyle() {
+    if (live != null) {
+      liveGlassStyle(live, glassClear, glassTint, glassPress, touchX, touchY);
+      // A new effect on the capture node shows only on the next frame, and a
+      // finger held still asks for none. This draw re-captures nothing: the
+      // backdrop has not changed.
+      invalidate();
+    }
+  }
+
+  /**
+   * Watches touches without taking them: the children still get every press,
+   * and interactive glass only follows the finger and swells under it.
+   */
+  @Override
+  public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+    if (glassInteractive && MODE_GLASS.equals(blurMode) && live != null) {
+      switch (event.getActionMasked()) {
+        case android.view.MotionEvent.ACTION_DOWN:
+          touchX = event.getX();
+          touchY = event.getY();
+          animatePress(1f);
+          break;
+        case android.view.MotionEvent.ACTION_MOVE:
+          touchX = event.getX();
+          touchY = event.getY();
+          pushGlassStyle();
+          break;
+        case android.view.MotionEvent.ACTION_UP:
+        case android.view.MotionEvent.ACTION_CANCEL:
+          animatePress(0f);
+          break;
+        default:
+          break;
+      }
+    }
+
+    return super.dispatchTouchEvent(event);
+  }
+
+  private void animatePress(float to) {
+    if (pressAnimator != null) {
+      pressAnimator.cancel();
+    }
+
+    if (glassPress == to) {
+      return;
+    }
+
+    pressAnimator = ValueAnimator.ofFloat(glassPress, to);
+    // In fast, out slower: iOS's glass settles back rather than snapping.
+    pressAnimator.setDuration(to > glassPress ? 150 : 280);
+    pressAnimator.addUpdateListener(
+        animation -> {
+          glassPress = (float) animation.getAnimatedValue();
+          pushGlassStyle();
+        });
+    pressAnimator.start();
+  }
+
   public void setSaturation(float saturation) {
     if (this.saturation != saturation) {
       this.saturation = saturation;
@@ -389,6 +486,11 @@ public class SajjadBlurOverlayView extends ReactViewGroup
 
   @Override
   protected void onDetachedFromWindow() {
+    if (pressAnimator != null) {
+      pressAnimator.cancel();
+      pressAnimator = null;
+    }
+    glassPress = 0f;
     stopLive();
     stopPeriodicReblur();
     // The window is not ours, so leave it as it was found — and do it before
@@ -648,6 +750,7 @@ public class SajjadBlurOverlayView extends ReactViewGroup
 
     if (wantLive && !liveRunning) {
       live = newLiveBlur();
+      liveGlassStyle(live, glassClear, glassTint, glassPress, touchX, touchY);
       liveRunning = true;
       liveStalled = false;
       liveDrawn = false;
@@ -952,6 +1055,12 @@ public class SajjadBlurOverlayView extends ReactViewGroup
   private static boolean liveDraw(
       Object live, Canvas canvas, int width, int height, float radius) {
     return ((LiveBlur) live).draw(canvas, width, height, radius);
+  }
+
+  @RequiresApi(LIVE_SDK)
+  private static void liveGlassStyle(
+      Object live, boolean clear, int tint, float press, float touchX, float touchY) {
+    ((LiveBlur) live).setGlassStyle(clear, tint, press, touchX, touchY);
   }
 
   @RequiresApi(LIVE_SDK)

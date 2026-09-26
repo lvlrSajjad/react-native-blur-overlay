@@ -1246,7 +1246,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-blur-overlay (3.0.0):
+  - react-native-blur-overlay (3.1.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1943,7 +1943,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: fedd8e34e26194cf70bd66e77c49170e22d88b82
   React-microtasksnativemodule: aa3ea1db91e208694042bd8af0bda65202f4a68d
   React-mutationobservernativemodule: 2dcf0e333fe6621c3ffea838fcc48d54435724a1
-  react-native-blur-overlay: 521503ed497016fe3ab8173f4b6c7a415d967da1
+  react-native-blur-overlay: 2660d84d3e259d7eb7083ebcedf65b3b06e17b2e
   React-NativeModulesApple: 885f4cd7626a1ffe20e0dcd23ef8528f415795d3
   React-networking: 31c21d3a8ea93c859706f876d27578782b05d250
   React-oscompat: 3175a287dd7175d1a20fdce5048a4b9e11f4b915

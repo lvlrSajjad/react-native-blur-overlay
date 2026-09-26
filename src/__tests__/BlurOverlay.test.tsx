@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react-native';
-import { Platform, Text } from 'react-native';
+import { PixelRatio, Platform, Text } from 'react-native';
 
 import BlurOverlay, { BlurTarget, closeOverlay, openOverlay } from '../index';
 import NativeBlurOverlay from '../SajjadBlurOverlayNativeComponent';
@@ -324,6 +324,86 @@ describe('live blur', () => {
     );
 
     expect(overlayProps().downsampling).toBe(1);
+  });
+});
+
+describe('glass', () => {
+  const overlayProps = () =>
+    screen.UNSAFE_getByType(NativeBlurOverlay as never).props;
+
+  beforeEach(() => {
+    jest.spyOn(PixelRatio, 'get').mockReturnValue(3);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('keeps the 3.0 radius default outside glass', () => {
+    render(
+      <BlurOverlay visible fadeDuration={0} blurMode="live">
+        {children}
+      </BlurOverlay>
+    );
+
+    expect(overlayProps().radius).toBe(20);
+  });
+
+  it('turns blurRadius from dp into pixels, and lets it win over radius', () => {
+    render(
+      <BlurOverlay visible fadeDuration={0} radius={40} blurRadius={8}>
+        {children}
+      </BlurOverlay>
+    );
+
+    expect(overlayProps().radius).toBe(24);
+  });
+
+  it('gives each glass variant its own blur when none is set', () => {
+    render(
+      <BlurOverlay visible fadeDuration={0} blurMode="glass">
+        {children}
+      </BlurOverlay>
+    );
+
+    expect(overlayProps()).toMatchObject({ glassVariant: 'regular', radius: 30 });
+
+    screen.rerender(
+      <BlurOverlay visible fadeDuration={0} blurMode="glass" glassVariant="clear">
+        {children}
+      </BlurOverlay>
+    );
+
+    expect(overlayProps()).toMatchObject({ glassVariant: 'clear', radius: 15 });
+  });
+
+  it('lets an explicit radius win over the variant blur', () => {
+    render(
+      <BlurOverlay visible fadeDuration={0} blurMode="glass" radius={12}>
+        {children}
+      </BlurOverlay>
+    );
+
+    expect(overlayProps().radius).toBe(12);
+  });
+
+  it('passes tint and interactive through to the native view', () => {
+    render(
+      <BlurOverlay
+        visible
+        fadeDuration={0}
+        blurMode="glass"
+        glassTint="rgba(0,122,255,0.35)"
+        interactive
+      >
+        {children}
+      </BlurOverlay>
+    );
+
+    expect(overlayProps()).toMatchObject({
+      glassTint: 'rgba(0,122,255,0.35)',
+      interactive: true,
+    });
   });
 });
 

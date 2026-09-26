@@ -90,6 +90,24 @@ public class SajjadBlurOverlayManager extends ViewGroupManager<SajjadBlurOverlay
   }
 
   @Override
+  @ReactProp(name = "glassVariant")
+  public void setGlassVariant(SajjadBlurOverlayView view, @Nullable String value) {
+    view.setGlassVariant(value);
+  }
+
+  @Override
+  @ReactProp(name = "glassTint", customType = "Color")
+  public void setGlassTint(SajjadBlurOverlayView view, @Nullable Integer value) {
+    view.setGlassTint(value);
+  }
+
+  @Override
+  @ReactProp(name = "interactive", defaultBoolean = false)
+  public void setInteractive(SajjadBlurOverlayView view, boolean value) {
+    view.setGlassInteractive(value);
+  }
+
+  @Override
   @ReactProp(name = "blurMode")
   public void setBlurMode(SajjadBlurOverlayView view, @Nullable String value) {
     view.setBlurMode(value);

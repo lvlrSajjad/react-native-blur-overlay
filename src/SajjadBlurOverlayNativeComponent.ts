@@ -1,5 +1,10 @@
 import { codegenNativeComponent } from 'react-native';
-import type { CodegenTypes, HostComponent, ViewProps } from 'react-native';
+import type {
+  CodegenTypes,
+  ColorValue,
+  HostComponent,
+  ViewProps,
+} from 'react-native';
 
 export interface NativeProps extends ViewProps {
   /**
@@ -46,6 +51,22 @@ export interface NativeProps extends ViewProps {
    * leaves it frozen, which is what every 3.0 app gets. Android only.
    */
   snapshotUpdateFps?: CodegenTypes.WithDefault<CodegenTypes.Int32, 0>;
+  /**
+   * `"regular"` or `"clear"` glass, when `blurMode` is `"glass"`. iOS's
+   * `UIGlassEffectStyle`; on Android, `"regular"` is lifted toward white and
+   * `"clear"` blurs less and is not.
+   */
+  glassVariant?: CodegenTypes.WithDefault<string, 'regular'>;
+  /**
+   * Colour of the glass body, when `blurMode` is `"glass"`. Its alpha is the
+   * strength. iOS's `UIGlassEffect.tintColor`.
+   */
+  glassTint?: ColorValue;
+  /**
+   * Glass that reacts to touch, when `blurMode` is `"glass"`. iOS's
+   * `UIGlassEffect.interactive`.
+   */
+  interactive?: CodegenTypes.WithDefault<boolean, false>;
   /**
    * `UIBlurEffectStyle` to use. iOS only.
    */

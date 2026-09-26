@@ -20,6 +20,7 @@ import BlurOverlay, {
   type BlurMode,
   type BlurOverlayInstance,
   type BlurStyle,
+  type GlassVariant,
 } from 'react-native-blur-overlay';
 
 const BLUR_STYLES: BlurStyle[] = [
@@ -62,9 +63,6 @@ const GLASS_RADIUS = Math.round(PixelRatio.get() * GLASS_DP);
 // visibly change how blurred the panel is.
 const GLASS_DOWNSAMPLING = 4;
 
-// The glass tab bar blurs lightly: a lens can only bend detail it can still see,
-// and the Liquid Glass references keep the content under the bar nearly legible.
-const TAB_BAR_RADIUS = Math.round(PixelRatio.get() * 3);
 
 // Shapes on the tiles, so there is detail behind the glass for the lens to bend.
 const GLYPHS = ['◆', '●', '▲', '■', '✦', '♥', '★', '✚'];
@@ -105,6 +103,12 @@ interface LaunchProps {
    * look right in, since it is what an iOS 26 Liquid Glass app puts on screen.
    */
   tabBar?: boolean;
+  /** `glassVariant` for the tab bar: `regular` or `clear`. */
+  glassVariant?: GlassVariant;
+  /** `glassTint` for the tab bar, as a colour string. */
+  glassTint?: string;
+  /** Makes the tab bar's glass `interactive`. */
+  interactive?: boolean;
   /** Opens the `<Modal>` demo on launch. */
   modal?: boolean;
   /**
@@ -129,6 +133,9 @@ export default function App({
   panel,
   shaped,
   tabBar,
+  glassVariant,
+  glassTint,
+  interactive,
   modal,
   modalPartial,
   blurTargetId,
@@ -392,7 +399,10 @@ export default function App({
         blurMode={blurMode}
         blurTargetId={blurTargetId}
         maxUpdateFps={maxUpdateFps}
-        radius={glassRadius ?? TAB_BAR_RADIUS}
+        radius={glassRadius}
+        glassVariant={glassVariant}
+        glassTint={glassTint}
+        interactive={interactive}
         downsampling={2}
         brightness={-10}
         // A blur washes colour out; iOS materials put it back at about this.

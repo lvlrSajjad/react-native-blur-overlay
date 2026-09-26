@@ -153,9 +153,13 @@ When `visible` is set, the imperative API is ignored for that overlay.
 | --- | --- | --- | --- | --- |
 | `visible` | `boolean` | — | both | Controls the overlay declaratively. When set, the imperative API is ignored. |
 | `id` | `string` | `'default'` | both | Id used by `openOverlay(id)` / `closeOverlay(id)`. |
-| `radius` | `number` | `20` | Android | Blur radius, in **physical pixels** — see [choosing a radius](#choosing-a-radius). |
+| `blurRadius` | `number` | — | Android | Blur radius in **dp**, the same amount on every screen. Wins over `radius`. iOS has no blur-amount control. |
+| `radius` | `number` | `20` | Android | *Deprecated — use `blurRadius`.* Blur radius in **physical pixels** — see [choosing a radius](#choosing-a-radius). |
 | `downsampling` | `number` | `1`, or `2` when `blurMode="live"` | Android | How much the capture is scaled down before blurring. Higher is faster and coarser. |
 | `brightness` | `number` | `0` | Android | Brightness offset, `-255`..`255`. Negative darkens. |
+| `glassVariant` | `'regular' \| 'clear'` | `'regular'` | both | Which [Liquid Glass](#liquid-glass): `regular` is frosted and milky, `clear` is translucent, for glass over rich content. |
+| `glassTint` | `ColorValue` | — | both | Colour of the glass body; its alpha is the strength. |
+| `interactive` | `boolean` | `false` | both | Glass that responds to touch. |
 | `saturation` | `number` | `1` | Android | Colour saturation of the blur: `1` leaves it, `0` is grey, above `1` is more vivid. A blur washes colour out; iOS materials put it back at about `1.8`. |
 | `blurMode` | `'snapshot' \| 'live' \| 'glass'` | `'snapshot'` | Android; `glass` on both | `live` re-blurs a [`<BlurTarget>`](#live-blur-on-android) as it draws, or — [inside a `<Modal>`](#blur-behind-a-modal) — asks the system to blur behind the modal's window. [`glass`](#liquid-glass) is `live` plus a refracting edge on Android 13+, and the system Liquid Glass on iOS 26+. Each falls back a step wherever it cannot run. |
 | `blurTargetId` | `string` | `'default'` | Android | Which `<BlurTarget>` a live overlay captures. |
@@ -303,8 +307,8 @@ Two things to know:
 <BlurOverlay
   visible
   blurMode="glass"
-  saturation={1.8}
-  radius={PixelRatio.get() * 3}
+  glassVariant="regular"   // or "clear"
+  interactive              // responds to touch
   style={{
     position: 'absolute', left: 24, right: 24, bottom: 32, height: 64,
     borderRadius: 32,                         // a capsule: half the height
@@ -320,7 +324,22 @@ Two things to know:
   <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/liquid-glass-android-vs-ios.png" width="600" alt="The same capsule tab bar: Android 13 with the AGSL lens, above; iOS 26's system Liquid Glass, below">
 </p>
 
-**On iOS 26+** it is Apple's own `UIGlassEffect`, shaped to the overlay's `borderRadius` — a capsule when the radius is half the height. The blur amount is Apple's; `radius`, `saturation` and `downsampling` are Android-only and ignored here. Below iOS 26 it is the ordinary `blurStyle` blur.
+**On iOS 26+** it is Apple's own `UIGlassEffect`, shaped to the overlay's `borderRadius` — a capsule when the radius is half the height. The blur amount is Apple's; `blurRadius`, `saturation` and `downsampling` are Android-only and ignored here. Below iOS 26 it is the ordinary `blurStyle` blur. Children sit inside the glass's content view, as Apple intends, so `vibrant` does not apply.
+
+**Variants, tint and touch** map one to one:
+
+| Prop | iOS 26+ | Android 13+ |
+| --- | --- | --- |
+| `glassVariant="regular"` (default) | `UIGlassEffectStyleRegular` | a 10dp blur, lifted toward white — the milky, legible look |
+| `glassVariant="clear"` | `UIGlassEffectStyleClear` | a 5dp blur, not lifted: vivid and translucent |
+| `glassTint` | `tintColor` | the body mixes toward the colour by its alpha |
+| `interactive` | `interactive` | a soft light blooms under the finger, and the rim brightens |
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/liquid-glass-variants.png" width="700" alt="Regular, clear and blue-tinted glass, iOS 26 on the left and Android on the right">
+</p>
+
+Set `blurRadius` to override a variant's blur on Android.
 
 **On Android 13+ (API 33)** it is [live blur](#live-blur-on-android) with an AGSL lens chained after it:
 
@@ -332,8 +351,8 @@ It needs a `<BlurTarget>`, like live blur. It falls back to `live` on Android 12
 
 Tips:
 
-- **Blur lightly.** A lens can only bend detail it can still see. The tab bar above uses 3dp; at iOS-material strengths the edge distortion disappears into the frost.
-- **Pair it with `saturation` around `1.8`**, or the Android glass reads flatter than iOS's.
+- **Want more distortion? Blur less.** A lens can only bend detail it can still see: `glassVariant="clear"`, or a small `blurRadius`, shows the edge distortion most.
+- **`saturation` is Android-only.** A blur washes colour out; around `1.5`–`1.8` brings Android glass back to iOS's vividness. The comparison above uses `1.8`.
 - **A uniform `borderRadius` only.** The lens and the clip both need one; per-corner radii leave it square.
 
 **What it costs.** Measured on a Galaxy A22 (Helio G80, Mali-G52), the weakest phone we have: the lens adds no measurable GPU time, and about 0.4ms of RenderThread time per frame over `live`. At **60Hz** it holds the frame rate, with P90 frame times of 15–25ms and at most 3.6% janky frames. At **90Hz** that phone runs both `live` and `glass` at the edge of its budget, and glass tips over more often: 2–14% janky frames depending on the run, against live's 1.4–2.2%. It never captures above half resolution, whatever `downsampling` says, because at full resolution it measured 100% jank at 90Hz. The full numbers and traces are in [RESULTS.md](docs/live-blur/RESULTS.md).
@@ -604,9 +623,9 @@ window, [the system's window blur behind a `<Modal>`](#blur-behind-a-modal),
 below Android 12, and `borderRadius` / `borderWidth` / `backgroundColor`
 finally working on the Android overlay itself.
 
-Next, keeping iOS and Android in step: `glassVariant` (`regular` / `clear`),
-`glassTint` and `interactive` glass, each built on both platforms at once, and a
-`blurRadius` in dp that means the same on every phone. The constraints, research,
+3.2 adds `glassVariant`, `glassTint` and `interactive` glass, each built on both
+platforms at once, and `blurRadius`, a blur radius in dp. Next: glass shapes that
+merge as they approach each other, as iOS's `UIGlassContainerEffect` does. The constraints, research,
 measurements and plan are in [docs/live-blur/PLAN.md](docs/live-blur/PLAN.md)
 and [RESULTS.md](docs/live-blur/RESULTS.md).
 

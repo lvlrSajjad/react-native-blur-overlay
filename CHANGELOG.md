@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased (3.2.0)
+
+Glass options that exist on both platforms: each maps to a `UIGlassEffect`
+property on iOS 26 and is built to match on Android 13.
+
+### Added
+
+- **`glassVariant`**: `'regular'` (default) or `'clear'`. iOS's two glass
+  styles. On Android, regular is a 10dp blur lifted toward white and clear a
+  5dp blur that is not, matched side by side against iOS 26.
+- **`glassTint`**: the glass body's colour; its alpha is the strength. iOS's
+  `tintColor`.
+- **`interactive`**: glass that responds to touch. iOS's `interactive`; on
+  Android a light blooms under the finger and the rim brightens, without taking
+  the touch from the children.
+- **`blurRadius`**: a blur radius in dp, so it blurs the same on every screen.
+  Android only; it wins over `radius`.
+
+### Changed
+
+- With `blurMode="glass"` and no radius set, the Android blur now follows
+  `glassVariant` (10dp regular, 5dp clear) instead of 20 physical pixels.
+- On iOS, glass now hosts the children inside its content view, as Apple
+  intends, which is what lets `interactive` see touches.
+
+### Deprecated
+
+- `radius`, which is in physical pixels and so blurs differently on every
+  Android screen. Use `blurRadius`. `radius` is still honoured.
+
 ## 3.1.0
 
 Live blur on Android, and Liquid Glass on both platforms. Everything here is

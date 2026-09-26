@@ -28,6 +28,10 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
    * `layer.cornerRadius` at 0.
    */
   CGFloat _glassCornerRadius;
+  /** `glassVariant`: YES for `"clear"`, NO for `"regular"`. */
+  BOOL _glassClear;
+  UIColor *_Nullable _glassTint;
+  BOOL _glassInteractive;
 }
 
 #pragma mark - Lifecycle
@@ -118,8 +122,12 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   // Index 0 keeps the blur behind the children.
   [self insertSubview:_blurView atIndex:0];
 
-  // A vibrancy effect is derived from a blur effect, and glass is not one.
-  if (_currentVibrant && glassEffect == nil) {
+  if (glassEffect != nil) {
+    // Glass reacts to touches, and treats content for legibility, only inside
+    // its own content view — outside it, `interactive` would never see a touch.
+    [_blurView.contentView addSubview:_containerView];
+  } else if (_currentVibrant) {
+    // A vibrancy effect is derived from a blur effect, and glass is not one.
     UIVibrancyEffect *vibrancyEffect = [UIVibrancyEffect effectForBlurEffect:blurEffect];
     _vibrancyView = [[UIVisualEffectView alloc] initWithEffect:vibrancyEffect];
     _vibrancyView.frame = self.bounds;
@@ -142,7 +150,11 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
 {
 #if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   if (@available(iOS 26.0, *)) {
-    return [UIGlassEffect effectWithStyle:UIGlassEffectStyleRegular];
+    UIGlassEffect *glass = [UIGlassEffect
+        effectWithStyle:_glassClear ? UIGlassEffectStyleClear : UIGlassEffectStyleRegular];
+    glass.tintColor = _glassTint;
+    glass.interactive = _glassInteractive;
+    return glass;
   }
 #endif
 
@@ -192,6 +204,24 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   return [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
 }
 
+/** The glass-only props; they rebuild the effect only while it is glass. */
+- (void)setGlassClear:(BOOL)clear tint:(nullable UIColor *)tint interactive:(BOOL)interactive
+{
+  if (clear == _glassClear && interactive == _glassInteractive &&
+      (tint == _glassTint || [tint isEqual:_glassTint])) {
+    return;
+  }
+
+  _glassClear = clear;
+  _glassTint = tint;
+  _glassInteractive = interactive;
+
+  if (_currentGlass) {
+    [self applyEffect];
+    [self setNeedsLayout];
+  }
+}
+
 - (void)setBlurStyle:(nullable NSString *)blurStyle vibrant:(BOOL)vibrant
 {
   [self setBlurStyle:blurStyle vibrant:vibrant glass:_currentGlass];
@@ -230,6 +260,9 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   [self setBlurStyle:RCTNSStringFromStringNilIfEmpty(newViewProps.blurStyle)
              vibrant:newViewProps.vibrant
                glass:newViewProps.blurMode == "glass"];
+  [self setGlassClear:newViewProps.glassVariant == "clear"
+                 tint:RCTUIColorFromSharedColor(newViewProps.glassTint)
+          interactive:newViewProps.interactive];
 
   [super updateProps:props oldProps:oldProps];
 }
@@ -271,6 +304,7 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   _props = defaultProps;
 
   _glassCornerRadius = 0;
+  [self setGlassClear:NO tint:nil interactive:NO];
   [self setBlurStyle:SajjadBlurOverlayDefaultStyle vibrant:NO glass:NO];
 }
 
@@ -286,6 +320,38 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
 - (nullable NSString *)blurStyle
 {
   return _currentBlurStyle;
+}
+
+- (void)setGlassVariant:(nullable NSString *)glassVariant
+{
+  [self setGlassClear:[glassVariant isEqualToString:@"clear"]
+                 tint:_glassTint
+          interactive:_glassInteractive];
+}
+
+- (nullable NSString *)glassVariant
+{
+  return _glassClear ? @"clear" : @"regular";
+}
+
+- (void)setGlassTint:(nullable UIColor *)glassTint
+{
+  [self setGlassClear:_glassClear tint:glassTint interactive:_glassInteractive];
+}
+
+- (nullable UIColor *)glassTint
+{
+  return _glassTint;
+}
+
+- (void)setInteractive:(BOOL)interactive
+{
+  [self setGlassClear:_glassClear tint:_glassTint interactive:interactive];
+}
+
+- (BOOL)interactive
+{
+  return _glassInteractive;
 }
 
 - (void)setBlurMode:(nullable NSString *)blurMode

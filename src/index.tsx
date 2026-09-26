@@ -9,10 +9,12 @@ import {
 } from 'react';
 import {
   Animated,
+  PixelRatio,
   Platform,
   Pressable,
   StyleSheet,
   View,
+  type ColorValue,
   type StyleProp,
   type ViewProps,
   type ViewStyle,
@@ -64,6 +66,17 @@ export type BlurStyle =
  * modal, frozen.
  */
 export type BlurMode = 'snapshot' | 'live' | 'glass';
+
+/**
+ * Liquid Glass comes in two variants on iOS 26, and this library keeps the
+ * same two on Android: `regular` is frosted (what system bars use), `clear` is
+ * highly translucent, for glass over photos and video.
+ */
+export type GlassVariant = 'regular' | 'clear';
+
+// The blur each glass variant gets on Android when neither `blurRadius` nor
+// `radius` is set, in dp, matched by eye against iOS 26's two styles.
+const GLASS_BLUR_DP: Record<GlassVariant, number> = { regular: 10, clear: 5 };
 
 export interface BlurTargetProps extends ViewProps {
   /**
@@ -137,8 +150,41 @@ export interface BlurOverlayProps {
    * matching.
    *
    * @default 20
+   * @deprecated Use `blurRadius`, which is in dp. Still honoured when
+   * `blurRadius` is not set.
    */
   radius?: number;
+  /**
+   * Blur radius in **dp**, so it blurs the same amount on every screen.
+   * Android only: iOS offers no blur amount on its materials or its glass.
+   * Takes precedence over `radius`.
+   *
+   * With `blurMode="glass"` and neither set, the blur follows `glassVariant`.
+   */
+  blurRadius?: number;
+  /**
+   * Which Liquid Glass, when `blurMode` is `"glass"`: `regular` (frosted, the
+   * default) or `clear` (highly translucent, for glass over rich content like
+   * photos). iOS 26's `UIGlassEffectStyle`; on Android, `regular` is milky and
+   * `clear` blurs less and is not lifted toward white, as on iOS.
+   *
+   * @default 'regular'
+   */
+  glassVariant?: GlassVariant;
+  /**
+   * Colour of the glass body, when `blurMode` is `"glass"`. Its alpha sets how
+   * strongly it tints: `'rgba(0,122,255,0.3)'` is a light blue glass. iOS
+   * 26's `UIGlassEffect.tintColor`, mixed the same way on Android.
+   */
+  glassTint?: ColorValue;
+  /**
+   * Glass that responds to touch, when `blurMode` is `"glass"`: on iOS 26 the
+   * system's own interactive glass; on Android the glass swells and its rim
+   * brightens under the finger.
+   *
+   * @default false
+   */
+  interactive?: boolean;
   /**
    * How much the snapshot is scaled down before being blurred: higher values
    * blur faster and coarser. Android only.
@@ -311,7 +357,11 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
       visible,
       id,
       idBlur,
-      radius = 20,
+      radius,
+      blurRadius,
+      glassVariant = 'regular',
+      glassTint,
+      interactive = false,
       downsampling,
       brightness = 0,
       saturation = 1,
@@ -339,6 +389,15 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
     // measured as free on low-end hardware; a snapshot runs once and can afford
     // full resolution.
     const scale = downsampling ?? (blurMode === 'snapshot' ? 1 : 2);
+    // Native takes physical pixels. `blurRadius` is dp and wins; then the
+    // deprecated `radius`; then, for glass, the variant's own blur.
+    const pixels =
+      blurRadius !== undefined
+        ? Math.round(blurRadius * PixelRatio.get())
+        : (radius ??
+          (blurMode === 'glass'
+            ? Math.round(GLASS_BLUR_DP[glassVariant] * PixelRatio.get())
+            : 20));
     const duration = fadeDuration ?? animationDuration ?? 500;
     const isControlled = visible !== undefined;
 
@@ -484,7 +543,7 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
         style={[styles.fill, styles.stack, { opacity }]}
       >
         <NativeBlurOverlay
-          radius={radius}
+          radius={pixels}
           downsampling={scale}
           brightness={brightness}
           saturation={saturation}
@@ -495,6 +554,9 @@ const BlurOverlay = forwardRef<BlurOverlayInstance, BlurOverlayProps>(
           snapshotUpdateFps={snapshotUpdateFps}
           blurStyle={blurStyle}
           vibrant={vibrant}
+          glassVariant={glassVariant}
+          glassTint={glassTint}
+          interactive={interactive}
           style={[styles.fill, customStyles, style]}
         >
           {onPress ? (
