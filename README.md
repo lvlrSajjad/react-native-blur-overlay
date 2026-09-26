@@ -4,7 +4,14 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-blur-overlay.svg)](https://www.npmjs.com/package/react-native-blur-overlay)
 [![license](https://img.shields.io/npm/l/react-native-blur-overlay.svg)](./LICENSE)
 
-A native blur overlay for React Native: it blurs whatever is rendered behind it and lets you put your own content on top — full-screen, or just one rounded panel, which is the closest you can get to iOS's frosted-glass materials on Android.
+A native blur overlay for React Native: it blurs whatever is rendered behind it and lets you put your own content on top — full-screen, one rounded panel, or a floating **Liquid Glass** tab bar that looks the same on iOS and Android.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-liquid-glass.gif" width="400" alt="iOS 26: a floating capsule tab bar in Liquid Glass over a scrolling grid">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-liquid-glass.gif" width="400" alt="Android 13: the same capsule tab bar, with the backdrop bending into the rim as the grid scrolls">
+</p>
+
+<sub><strong>The same component, the same props</strong> — <code>blurMode="glass"</code> — on iOS 26 (Apple's own Liquid Glass, first) and on Android 13 (a Galaxy A22, 2021 low-end hardware, second).</sub>
 
 <p>
   <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-glass.png" width="220" alt="iOS: a rounded frosted-glass panel">
@@ -15,6 +22,7 @@ A native blur overlay for React Native: it blurs whatever is rendered behind it 
 
 <sub>The <a href="./example">example app</a> on the New Architecture. The first two are <strong>the same glass panel, same code</strong>, on iOS and Android; then a full-screen overlay on each.</sub>
 
+- **[Liquid Glass on both platforms](#liquid-glass)** — `blurMode="glass"` is Apple's own glass on iOS 26 and a matching refracting lens on Android 13
 - **Frosted-glass panels on both platforms** — the same code that gives you a `UIVisualEffectView` material on iOS gives you a matching glass panel on Android
 - **[Live blur on Android 12+](#live-blur-on-android)** — content scrolling behind the glass stays blurred, as it always has on iOS
 - **[Blur behind a `<Modal>`](#blur-behind-a-modal)**, which no capture-based library on Android can reach
@@ -23,7 +31,7 @@ A native blur overlay for React Native: it blurs whatever is rendered behind it 
 - Autolinked — no Podfile or `MainApplication` edits
 - No third-party dependencies
 
-> **3.1 is additive.** Live blur is opt-in and `snapshot` stays the default, so an app upgrading from 3.0 sees no change until it asks for one. Coming from 2.x, see [Migrating from 2.x](#migrating-from-2x).
+> **3.1 is additive.** Live blur and glass are opt-in and `snapshot` stays the default, so an app upgrading from 3.0 sees no change until it asks for one. Coming from 2.x, see [Migrating from 2.x](#migrating-from-2x).
 
 ## Requirements
 
@@ -148,7 +156,8 @@ When `visible` is set, the imperative API is ignored for that overlay.
 | `radius` | `number` | `20` | Android | Blur radius, in **physical pixels** — see [choosing a radius](#choosing-a-radius). |
 | `downsampling` | `number` | `1`, or `2` when `blurMode="live"` | Android | How much the capture is scaled down before blurring. Higher is faster and coarser. |
 | `brightness` | `number` | `0` | Android | Brightness offset, `-255`..`255`. Negative darkens. |
-| `blurMode` | `'snapshot' \| 'live'` | `'snapshot'` | Android | `live` re-blurs a [`<BlurTarget>`](#live-blur-on-android) as it draws, or — [inside a `<Modal>`](#blur-behind-a-modal) — asks the system to blur behind the modal's window. Falls back to `snapshot` wherever it cannot do either. |
+| `saturation` | `number` | `1` | Android | Colour saturation of the blur: `1` leaves it, `0` is grey, above `1` is more vivid. A blur washes colour out; iOS materials put it back at about `1.8`. |
+| `blurMode` | `'snapshot' \| 'live' \| 'glass'` | `'snapshot'` | Android; `glass` on both | `live` re-blurs a [`<BlurTarget>`](#live-blur-on-android) as it draws, or — [inside a `<Modal>`](#blur-behind-a-modal) — asks the system to blur behind the modal's window. [`glass`](#liquid-glass) is `live` plus a refracting edge on Android 13+, and the system Liquid Glass on iOS 26+. Each falls back a step wherever it cannot run. |
 | `blurTargetId` | `string` | `'default'` | Android | Which `<BlurTarget>` a live overlay captures. |
 | `maxUpdateFps` | `number` | `30` | Android | Upper bound on live re-blurs per second. `0` means every drawn frame. |
 | `captureOutset` | `number` | `0` | Android | How far past the overlay's edges a live capture reaches, in `radius` pixels. Removes the clamped edge a blur leaves at its border. |
@@ -202,6 +211,7 @@ import BlurOverlay, {
 | --- | --- | --- | --- |
 | **`snapshot`** (default) | Draws the screen behind the overlay into a bitmap once, blurs it off the main thread, and holds it. A **still image** — content that moves behind the overlay is not re-blurred. | API 24 | Nothing per frame. One software capture plus one Stack Blur each time it is taken. |
 | **`live`**, in the app's window | Re-records a [`<BlurTarget>`](#live-blur-on-android) subtree into a `RenderNode` as it draws and hands it to the RenderThread with a blur `RenderEffect`. Content moving behind the overlay stays blurred, as on iOS. | API 31+ and a `<BlurTarget>` | One re-record and one GPU blur per *drawn* frame, capped by `maxUpdateFps`. Nothing at all on a still screen. [Measured below.](#what-live-blur-costs) |
+| **`glass`** | `live`, plus one AGSL shader chained after the blur: the backdrop bends inward and folds back on itself toward the rim, under a thin, directionally lit hairline. [More below.](#liquid-glass) | API 33+ and a `<BlurTarget>`; falls back to `live` on API 31–32 | `live`'s cost plus ~0.4ms of RenderThread time per frame. Never runs above half resolution. |
 | **`live`**, inside a [`<Modal>`](#blur-behind-a-modal) | Asks the system to blur behind the modal's whole window. A modal is its own Android window and no capture can reach across one, so this is the only way. | API 31+, cross-window blur enabled, and an overlay covering the modal | Nothing — SurfaceFlinger composites it. |
 
 Each one falls back to the one above it, so `blurMode="live"` is safe to set unconditionally: below API 31, without a `<BlurTarget>`, or where cross-window blur is off, the overlay quietly shows a snapshot instead. It says which reason applied in logcat, once, under the `BlurOverlay` tag.
@@ -280,6 +290,55 @@ Two things to know:
   same panel is live; on Android 12+ you can make it live too, with
   [`blurMode="live"`](#live-blur-on-android), and below that you can at least
   [update it coarsely](#coarse-updates-below-android-12).
+
+### Liquid Glass
+
+`blurMode="glass"` is the iOS 26 Liquid Glass look, on both platforms, from one prop:
+
+```tsx
+<BlurTarget style={{ flex: 1 }}>
+  <FlatList /* ...your content... */ />
+</BlurTarget>
+
+<BlurOverlay
+  visible
+  blurMode="glass"
+  saturation={1.8}
+  radius={PixelRatio.get() * 3}
+  style={{
+    position: 'absolute', left: 24, right: 24, bottom: 32, height: 64,
+    borderRadius: 32,                         // a capsule: half the height
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+  }}
+>
+  {/* your tabs */}
+</BlurOverlay>
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/liquid-glass-android-vs-ios.png" width="600" alt="The same capsule tab bar: Android 13 with the AGSL lens, above; iOS 26's system Liquid Glass, below">
+</p>
+
+**On iOS 26+** it is Apple's own `UIGlassEffect`, shaped to the overlay's `borderRadius` — a capsule when the radius is half the height. The blur amount is Apple's; `radius`, `saturation` and `downsampling` are Android-only and ignored here. Below iOS 26 it is the ordinary `blurStyle` blur.
+
+**On Android 13+ (API 33)** it is [live blur](#live-blur-on-android) with an AGSL lens chained after it:
+
+- a band along the border pulls the blurred backdrop inward, following a quarter-circle profile, so content folds back on itself at the rim — the "mirrored" edge you see on iOS;
+- a hairline lit from the upper left, brightest where the edge faces the light or directly away from it, with a soft glow on the lit side;
+- a faint colour fringe, from sampling red and blue slightly apart.
+
+It needs a `<BlurTarget>`, like live blur. It falls back to `live` on Android 12, and to `snapshot` below that.
+
+Tips:
+
+- **Blur lightly.** A lens can only bend detail it can still see. The tab bar above uses 3dp; at iOS-material strengths the edge distortion disappears into the frost.
+- **Pair it with `saturation` around `1.8`**, or the Android glass reads flatter than iOS's.
+- **A uniform `borderRadius` only.** The lens and the clip both need one; per-corner radii leave it square.
+
+**What it costs.** Measured on a Galaxy A22 (Helio G80, Mali-G52), the weakest phone we have: the lens adds no measurable GPU time, and about 0.4ms of RenderThread time per frame over `live`. At **60Hz** it holds the frame rate, with P90 frame times of 15–25ms and at most 3.6% janky frames. At **90Hz** that phone runs both `live` and `glass` at the edge of its budget, and glass tips over more often: 2–14% janky frames depending on the run, against live's 1.4–2.2%. It never captures above half resolution, whatever `downsampling` says, because at full resolution it measured 100% jank at 90Hz. The full numbers and traces are in [RESULTS.md](docs/live-blur/RESULTS.md).
+
+The Android lens draws on two open-source implementations of Liquid Glass for Android: [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) (Apache-2.0), for the lens profile, and [QWEA0/Liquid-Glass-Android](https://github.com/QWEA0/Liquid-Glass-Android) (MIT), for the highlight and the dispersion.
 
 ### Live blur on Android
 
@@ -491,10 +550,9 @@ against 14ms for `radius={20}`, eight times the blur for one millisecond — so
 quality, not frame time, is what bounds how large you go.
 
 A blur is also an **average**, so a larger radius desaturates: mixed colours
-pull toward grey. iOS materials compensate with a saturation boost, and this
-library has no equivalent knob yet, so a big Android blur looks flatter than the
-iOS panel beside it. `brightness` cannot fix that — it shifts luminance, not
-saturation.
+pull toward grey. iOS materials compensate with a saturation boost; on Android,
+set `saturation` (around `1.8` matches iOS) to do the same. `brightness` cannot
+fix it — it shifts luminance, not saturation.
 
 ### Make it faster
 
@@ -539,17 +597,18 @@ TypeScript sources, so editing `src/` refreshes the app without a rebuild.
 
 ## Roadmap
 
-3.1.0 brings live blur on Android: [`blurMode="live"`](#live-blur-on-android)
-for a panel in your own window, [the system's window blur behind a
-`<Modal>`](#blur-behind-a-modal), [coarse periodic updates](#coarse-updates-below-android-12)
-below Android 12, and `borderRadius` / `borderWidth` / `backgroundColor` finally
-working on the Android overlay itself.
+3.1.0 brings live blur to Android and [Liquid Glass](#liquid-glass) to both
+platforms: [`blurMode="live"`](#live-blur-on-android) for a panel in your own
+window, [the system's window blur behind a `<Modal>`](#blur-behind-a-modal),
+`blurMode="glass"`, `saturation`, [coarse periodic updates](#coarse-updates-below-android-12)
+below Android 12, and `borderRadius` / `borderWidth` / `backgroundColor`
+finally working on the Android overlay itself.
 
-Sketched but not scheduled: a glass-edge refraction effect, and the
-`RenderNode.setBackdropRenderEffect` fast path that arrives with Android's SDK
-37.2. The constraints, the research, the measurements and the phased plan are in
-[docs/live-blur/PLAN.md](docs/live-blur/PLAN.md) and
-[RESULTS.md](docs/live-blur/RESULTS.md).
+Next, keeping iOS and Android in step: `glassVariant` (`regular` / `clear`),
+`glassTint` and `interactive` glass, each built on both platforms at once, and a
+`blurRadius` in dp that means the same on every phone. The constraints, research,
+measurements and plan are in [docs/live-blur/PLAN.md](docs/live-blur/PLAN.md)
+and [RESULTS.md](docs/live-blur/RESULTS.md).
 
 ## Contributing
 

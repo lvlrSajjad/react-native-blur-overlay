@@ -57,7 +57,12 @@ in the example app's release build:
 
 - `snapshot` and `live` cost the same as each other: live holds 60Hz with
   under 1.3% jank, and 90Hz at 1.4-2.2% jank, level with Phase 1.
-- `glass`: GLASS_NUMBERS
+- `glass`: the lens adds no measurable GPU time and about 0.4ms of RenderThread
+  time per frame over `live`. At 60Hz it holds the frame rate (P90 15-25ms, at
+  most 3.6% janky frames). At 90Hz that phone runs `live` and `glass` at the
+  edge of its budget, and glass tips over more often: 2-14% janky frames
+  depending on the run, a known limit on low-end 90Hz phones. Glass never
+  captures above half resolution.
 
 Per-corner radii shape a snapshot but not a live or glass blur, which can only
 be clipped to a uniform radius.

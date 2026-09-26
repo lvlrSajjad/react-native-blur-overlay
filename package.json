@@ -1,6 +1,6 @@
 {
   "name": "react-native-blur-overlay",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "A native blur overlay for React Native — blurs whatever is behind it on iOS and Android",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
