@@ -9,10 +9,10 @@ Phase 6 session 1 is done and **committed on branch `live-blur/phase6-glass`** (
 `4416d94`). It is not pushed and not merged to `master`. `blurMode="glass"` works on both
 platforms and the owner is happy with the look. Next session, in order:
 
-1. **The frame sweep** (Phase 6 session 2 prompt below). The owner deferred it; it takes
-   ~25–35 minutes. Before starting, ask how the A22 should stay awake: it locked itself
-   mid-recording once. Either the owner sets a 30-minute screen timeout, or, with their OK,
-   turn on the "stay awake while charging" dev option and turn it off afterwards.
+1. ~~**The frame sweep.**~~ Done in session 2. Snapshot and live are cleared. Glass is
+   bimodal: about half its runs are slow (8–14% jank at 90Hz) with flat GPU time. **Next:**
+   a `perfetto` trace of one slow and one fast glass run to find the CPU-side cost. The
+   A22 did not lock during sweeps: the swipes count as user activity.
 2. **The example app's UIScene adoption.** It crashes at launch on iOS 27. Example-only; a
    separate task was already offered for it.
 3. **Merge the branch**, then **Phase 5** → 3.1.0.
@@ -26,8 +26,8 @@ platforms and the owner is happy with the look. Next session, in order:
 | 2 — Modal / window blur | **passed** (2026-09-17) | `blurMode="live"` in a `<Modal>` blurs behind the window through `FLAG_BLUR_BEHIND` — *not* `Window.setBackgroundBlurRadius`, which needs a `Window` no public View API reaches; see RESULTS.md. Happy path on the API 37 emulator, degradation on the A22, plus the runtime toggle and the partial-coverage refusal. No physical device supporting cross-window blur has ever run it. |
 | 3 — Fallbacks, props, docs | **passed** (2026-09-26) | `setBackground()` gone from both paths, so `borderRadius`/`borderWidth`/`backgroundColor` work — which needed the manager to apply the border props itself, because RN hands a custom manager none of them. `snapshotUpdateFps` added, gated on the screen actually drawing. Live blur unchanged at 14ms P90. Docs rewritten for three paths. **Owes a consolidated sweep on the final build.** |
 | 4 — SDK 37.2 fast path | optional, any time | needs a capture-only mode to split re-record from blur; the library has none |
-| 5 — Release 3.1.0 | blocked on Phase 6 | must start with the consolidated 60/90Hz sweep Phase 3 deferred. Phase 6 session 2 can serve as that sweep if it covers snapshot, live and glass on the final build. Now also owes README coverage of `glass` and `saturation`. |
-| 6 — Glass edge refraction | **in progress**: looks done, unmeasured | 2026-09-26, session 1, on branch `live-blur/phase6-glass`: `blurMode="glass"` and `saturation` built. The Android lens is a port of Kyant0/AndroidLiquidGlass (Apache-2.0) and QWEA0/Liquid-Glass-Android (MIT), one AGSL pass chained after the live blur. The owner called it "quite liquidy" on the A22, then had the rim light tightened. iOS uses the system `UIGlassEffect` on 26+, shaped via `cornerConfiguration`, and was checked running on an iOS 26.5 simulator. Pills now clip on every live path, on both platforms. **Owed:** frame numbers on this code (session 2), and the example app's UIScene adoption (it crashes on iOS 27). See RESULTS.md "Phase 6 — first session". |
+| 5 — Release 3.1.0 | ready for snapshot + live | the consolidated 60/90Hz sweep is **done** for snapshot and live (Phase 6 session 2: unchanged from Phase 1). Glass is not cleared (see Phase 6). Owes README coverage of `glass` and `saturation`, and the example app's UIScene fix. |
+| 6 — Glass edge refraction | **in progress**: looks done, measured, bimodal | 2026-09-26, session 1, on branch `live-blur/phase6-glass`: `blurMode="glass"` and `saturation` built. The Android lens is a port of Kyant0/AndroidLiquidGlass (Apache-2.0) and QWEA0/Liquid-Glass-Android (MIT), one AGSL pass chained after the live blur. The owner called it "quite liquidy" on the A22, then had the rim light tightened. iOS uses the system `UIGlassEffect` on 26+, shaped via `cornerConfiguration`, and was checked running on an iOS 26.5 simulator. Pills now clip on every live path, on both platforms. **Session 2 measured it:** GPU cost is nil, but ~half of runs are slow (8–14% jank at 90Hz), cause unknown, CPU-side. **Owed:** a perfetto trace of a slow run vs a fast one, and the example app's UIScene adoption (it crashes on iOS 27). See RESULTS.md "Phase 6 — first session". |
 
 ## Still owed after Phase 3
 

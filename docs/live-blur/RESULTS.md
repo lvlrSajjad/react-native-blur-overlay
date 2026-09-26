@@ -1029,3 +1029,63 @@ radius copied nothing. The radius is now resolved from the props in `finalizeUpd
 `cornerConfiguration`, as a capsule when it is at least half the short side. The example
 app now takes launch arguments as initial props (`-tabBar true -blurMode glass`), the twin
 of Android's intent extras.
+
+## Phase 6 — the glass sweep — 2026-09-26 (session 2)
+
+Galaxy A22 (SM-A225F, API 33), example app release build, the floating capsule tab bar.
+Every variant blurs the same amount (3dp, `downsampling` 2); only `blurMode` changes.
+Harness: [`phase6-sweep.sh`](./phase6-sweep.sh), the Phase 3 harness with a new variant
+list, shuffled order and GPU percentiles. Baseline interleaved, refresh pinned and restored
+(both settings were unset and are unset again). 3 reps per rate, plus 5 extra glass-only
+reps at 60Hz.
+
+### 60Hz (budget 16.6ms)
+
+| Variant | P90 per rep | Janky per rep | GPU P90 |
+| --- | --- | --- | --- |
+| off | 13–16ms | 0.17–0.70% | 4ms |
+| snapshot | 15 / 16 / 16ms | 0.17% ×3 | — |
+| live | 16 / 17 / 15ms | 1.03 / 1.22 / 0.34% | — |
+| glass (sweep) | **25 / 24** / 14ms | **3.60 / 2.39** / 0.34% | — |
+| glass (extra 5) | **22 / 25** / 15 / 17 / 15ms | **2.39 / 2.56** / 1.03 / 0.34 / 0.35% | 4ms every run |
+
+### 90Hz (budget 11.1ms)
+
+| Variant | P90 per rep | Janky per rep | GPU P90 |
+| --- | --- | --- | --- |
+| off | 11–13ms | 0.34–1.15% | 4ms |
+| snapshot | 14 / 11 / 12ms | 0.81 / 0.34 / 0.45% | 4–5ms |
+| live | 14 / 14 / 13ms | 1.38 / 1.38 / 2.19% | 4ms |
+| glass | 14 / **17 / 16ms** | 1.96 / **14.10 / 8.05%** | 4ms |
+
+### What it says
+
+- **Snapshot and live on the final build are unchanged**: snapshot at baseline, live at
+  1.4–2.2% at 90Hz against Phase 1's 1.5%. **This discharges the consolidated sweep Phase 5
+  was waiting on, for those two modes.** Phase 3's gate and Phase 6's changes cost them
+  nothing measurable.
+- **Glass is bimodal.** Of 11 glass runs, about half look like live (P90 14–17ms at 60Hz,
+  jank ≤1%), and the rest are slow: P90 22–25ms and 2.4–3.6% jank at 60Hz, 8–14% jank at
+  90Hz. Nothing falls in between. The interleaved baselines stay flat throughout, so it is
+  not the phone's state as a whole. The debug counters confirm glass engaged on every run
+  (it rides the live capture path: ~95 captures per 360 frames, the 30fps cap).
+- **The lens is not the cost.** GPU P50/P90 is 3–4ms for every variant, glass included:
+  the shader adds no measurable GPU time on a Mali-G52. Whatever makes the slow runs slow
+  is on the CPU side of rendering (RenderThread or UI thread), not in the AGSL.
+- Against the spike: it did not collapse the way the spike's full-resolution glass did (100%
+  jank at 90Hz), but the slow mode's 8–14% jank at 90Hz is **not releasable**. At 60Hz the
+  slow mode costs latency more than dropped frames, as the spike also found.
+
+### Not yet known
+
+What distinguishes a slow run. Candidates, cheapest to test first:
+1. HWUI rebuilding the chained effect's intermediate layer or shader pipeline per frame in
+   some runs and not others. A `perfetto` trace of a slow and a fast run would show it
+   directly on the RenderThread.
+2. The capsule outline clip over a node whose effect reads outside its bounds, forcing an
+   offscreen layer.
+3. Launch-order effects: which variant ran before, since the process is killed but the GPU
+   driver's shader cache is not.
+
+**Decision:** glass stays out of a release until the slow mode is explained and gone at
+90Hz. Snapshot and live are cleared for 3.1.0.
