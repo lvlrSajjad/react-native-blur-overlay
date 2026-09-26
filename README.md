@@ -47,6 +47,18 @@ cd ios && pod install
 
 That's it — the library is autolinked. If you are upgrading from 2.x, **remove** the manual `pod 'SajjadBlurOverlay', :path => ...` line from your `Podfile` and the manual `add(SajjadBlurOverlayPackage())` call from `MainApplication`.
 
+### Expo
+
+Works in Expo apps that build their own native code — a [development build](https://docs.expo.dev/develop/development-builds/introduction/), `npx expo prebuild`, or EAS Build — on any Expo SDK that ships React Native 0.80 or newer:
+
+```bash
+npx expo install react-native-blur-overlay
+```
+
+Then rebuild the native app (`npx expo run:ios` / `npx expo run:android`, or a new EAS build). No config plugin is needed: the library is autolinked and asks for no native project changes.
+
+It does **not** work in **Expo Go**. Expo Go can only run the native code Expo ships inside it, and no third-party native library can be added to it — the overlay's component will not be found there.
+
 ## Usage
 
 ```tsx

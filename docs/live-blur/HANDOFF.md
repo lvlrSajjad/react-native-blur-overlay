@@ -30,6 +30,17 @@ settings unset, stay-awake off, logging property cleared. Ask before assuming it
    worktree `claude/laughing-keller-df6ca2`. Merge it if it is finished.
 5. Merge the branch, bump to 3.1.0, and hand the owner the tag command. **Do not push the
    tag yourself**: CI publishes to npm on it.
+6. **After 3.1.0 is published — Expo.** The README now has an Expo section (dev builds,
+   prebuild, EAS: yes; Expo Go: no). **It has not been verified on a real Expo app yet.**
+   Before the Directory PR: `create-expo-app` on the current SDK, `npx expo install` the
+   package, `npx expo prebuild`, build and run on iOS and Android, including `glass`.
+   Confirm which SDK is the first to ship React Native >= 0.80. Optionally add a CI job that
+   builds an Expo prebuild.
+7. **Then the React Native Directory PR** (owner's decision, 2026-09-26: after 3.1.0): add
+   the package to `react-native-libraries.json` in `react-native-community/directory`, with
+   ios/android, `newArchitecture: true`, and `expoGo: false`. That listing is how Expo users
+   find third-party libraries. Opening the PR is outward-facing: show the owner the diff
+   first.
 
 ## Status
 
