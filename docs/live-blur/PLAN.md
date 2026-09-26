@@ -264,6 +264,42 @@ Changelog, README, screenshots/GIF of live blur on both platforms, version bump,
 **Do not publish without running the example app on a device** — 3.0.0 shipped two
 iOS-breaking bugs that compile checks did not catch.
 
+## Platform parity and tiers (decided 2026-09-26)
+
+**Parity rule.** A mode or glass option exists only if it can look the same on iOS, or is
+Android-only compensation for something iOS does by default (like `saturation`).
+`blurMode="glass"` on Android 13+ and iOS 26+ is the reference: same props, and the owner
+judged them to look and feel alike.
+
+**Each API level gets the best technique it has.** Snapshot is not removed on any level:
+it is the only mode with no `<BlurTarget>` and no per-frame work, and removing it would
+break 3.x apps.
+
+| Android API | Technique | Modes | iOS counterpart |
+| --- | --- | --- | --- |
+| 33+ | RenderNode capture + RenderEffect blur + AGSL | snapshot, live, glass | 26+: `UIGlassEffect` for glass, `UIBlurEffect` otherwise |
+| 31–32 | RenderNode capture + RenderEffect blur | snapshot, live (glass → live) | <26: glass → `blurStyle` blur |
+| 24–30 | CPU StackBlur | snapshot (+ `snapshotUpdateFps`) | iOS is always live |
+
+The blur itself stays `RenderEffect` on 33+. A single-pass AGSL blur would read far more
+pixels than Skia's separable, downsampled one. AGSL is for per-pixel effects on top of it.
+
+**Planned, 3.2 — glass options with an iOS counterpart:**
+
+| Prop | iOS 26+ | Android 33+ |
+| --- | --- | --- |
+| `glassVariant: "regular" \| "clear"` | `UIGlassEffectStyleRegular` / `Clear` | a per-variant default blur (≈8–10dp / ≈2–3dp, to be matched side by side) plus QWEA0's clear dim |
+| `glassTint` | `tintColor` | tinted glass body in the lens |
+| `interactive` | `interactive` | press bulge + rim boost |
+| later: merging shapes | `UIGlassContainerEffect` `spacing` | SDF smooth-min of two shapes |
+
+Also for 3.2: **`blurRadius` in dp**, deprecating `radius`, which is physical pixels and so
+blurs differently on every Android density. iOS has no blur-amount knob on either
+`UIGlassEffect` or `UIBlurEffect`, so on iOS the variant is the only control, and a custom
+radius stays Android-only. Grain, tilt-driven highlights and scroll-edge effects have no
+per-view iOS option; they can tune Android's default look but do not become props.
+`blurMode="auto"` (best tier for the device) is proposed; not yet decided.
+
 ## Decision record
 
 - **Capture-based, not compositor-based** — the compositor API is `@hide` and the
