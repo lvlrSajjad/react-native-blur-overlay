@@ -3,41 +3,36 @@
 One phase per session. Start a new session, paste that phase's prompt, work, then update
 [RESULTS.md](./RESULTS.md) and the status line in [PLAN.md](./PLAN.md) before finishing.
 
-## Pick up here (as of 2026-09-26, release prepared)
+## Pick up here (as of 2026-09-26, evening)
 
-**3.1.0 is prepared on local `master`**, fast-forwarded from `live-blur/phase6-glass`:
-version bumped, CHANGELOG written, README with Liquid Glass GIFs from both platforms, and
-every check green (`typecheck`, `test`, `check:android`, `check:ios`, and
-`npm pack --dry-run`: 57kB, 40 files, no GIFs). `origin/master` was still at `c433a49`, so
-the push publishes all of Phases 0–6. **The owner pushes, not a session**:
-`git push origin master`, wait for CI, then `git tag v3.1.0 && git push origin v3.1.0`.
-CI publishes to npm on the tag.
+**3.1.0 is published** (npm `latest`), with live blur on Android and Liquid Glass on both
+platforms. Since then, on `master` (pushed only up to the 3.1.0 tag; later commits are
+local): the Expo section verified on SDK 57 (`66baeaa`), and the example app's UIScene
+adoption, so it launches on iOS 27 (`e4d7bbf`).
 
-After it is published:
+**React Native Directory PR:**
+[react-native-community/directory#2835](https://github.com/react-native-community/directory/pull/2835),
+opened from the owner's account (`gh` under `Coding/ME` uses
+`GH_CONFIG_DIR=~/.config/gh-personal`). CI is green after an `oxfmt` fix. It is waiting for
+a maintainer.
 
-1. **Finish the 90Hz glass sweep** with the 8dp capture margin removed, when the A22 is back.
-   It is borrowed, so ask first. Glass ships regardless (owner's decision, 2026-09-26); this
-   only refines the numbers in the README and CHANGELOG:
-   `HZ=90 REPS=4 ./docs/live-blur/phase6-sweep.sh`. See RESULTS.md "Tracing the slow mode".
-2. **Expo verification.** The README has an Expo section (dev builds, prebuild, EAS: yes;
-   Expo Go: no), **not yet verified on a real Expo app**. Run `create-expo-app` on the
-   current SDK, `npx expo install` the package, `npx expo prebuild`, then build and run on
-   iOS and Android, including `glass`. Confirm which SDK is the first to ship React
-   Native >= 0.80. Optionally add a CI job that builds an Expo prebuild.
-3. **Then the React Native Directory PR** (owner's decision: after 3.1.0): add the package
-   to `react-native-libraries.json` in `react-native-community/directory`, with
-   ios/android, `newArchitecture: true`, and `expoGo: false`. Opening the PR is
-   outward-facing: show the owner the diff first.
-4. **The example app's UIScene fix** (iOS 27 crash), from worktree
-   `claude/laughing-keller-df6ca2` if it is finished. It will conflict with the
-   launch-argument parsing `4416d94` added to `AppDelegate.swift`. While that worktree
-   exists, Jest also runs its copy of the tests (44 instead of 22, 17 failing): ignore
-   `.claude/` in the Jest config, or remove the worktree.
-5. **3.2**: `glassVariant`, `glassTint`, `interactive`, `blurRadius` in dp, per the parity
-   table in PLAN.md.
+**3.2 is built on branch `glass-options-3.2`** (`22bbaba`), not merged and not released:
+`glassVariant`, `glassTint`, `interactive`, `blurRadius`. It was tuned side by side on
+the iOS 26.5 simulator and the Android 17 emulator; see `docs/liquid-glass-variants.png`.
+CHANGELOG has an "Unreleased (3.2.0)" section. To release: merge, rename that section,
+bump to 3.2.0, and the owner pushes `master` and the `v3.2.0` tag.
 
-The README's Android GIF is the A22 on purpose: it is real low-end hardware. A sharper one
-recorded on the API 37 emulator exists but is not used.
+Open for 3.2:
+- **iOS `interactive` has not been seen responding.** It is Apple's own flag and is set,
+  but the simulator cannot hold a touch while a screenshot is taken. Check it by hand on
+  the simulator or a device.
+- A GIF of `interactive` and the variants would show them off better than the still.
+- Optional: the A22 frame sweep. The owner calls it extra information, not a gate; the
+  margin-removal re-sweep and 3.2's press animation are both unmeasured. The phone is
+  borrowed: ask.
+
+Later: glass shapes that merge (iOS `UIGlassContainerEffect`); `blurMode="auto"`
+(proposed, undecided).
 
 ## Status
 
