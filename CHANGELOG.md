@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (3.2.1)
+## 3.2.1
 
 ### Fixed
 
@@ -17,6 +17,9 @@
   denial-of-service advisories against it. Development tooling only: nothing
   in the published package changed.
 - The README shows `interactive` glass in motion on both platforms.
+- The package says what it does: its description and keywords now name Liquid
+  Glass, live blur and the platforms, and it ships an `llms.txt`, a short
+  plain-text summary for AI coding tools, also readable from `node_modules`.
 
 ## 3.2.0
 

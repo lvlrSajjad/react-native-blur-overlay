@@ -3,36 +3,25 @@
 One phase per session. Start a new session, paste that phase's prompt, work, then update
 [RESULTS.md](./RESULTS.md) and the status line in [PLAN.md](./PLAN.md) before finishing.
 
-## Pick up here (as of 2026-09-26, evening)
+## Pick up here (as of 2026-09-29)
 
-**3.1.0 is published** (npm `latest`), with live blur on Android and Liquid Glass on both
-platforms. Since then, on `master` (pushed only up to the 3.1.0 tag; later commits are
-local): the Expo section verified on SDK 57 (`66baeaa`), and the example app's UIScene
-adoption, so it launches on iOS 27 (`e4d7bbf`).
+Published: 3.1.0 (live blur, Liquid Glass on both platforms), 3.2.0 (`glassVariant`,
+`glassTint`, `interactive`, `blurRadius`), and 3.2.1 (iOS blur follows `borderRadius`,
+Metro 0.87.1 in the lockfile, `llms.txt` and discoverable package metadata). Listed on
+React Native Directory (`react-native-community/directory#2835`, merged 2026-09-26).
+Expo is verified on SDK 57, and the example app runs on iOS 27.
 
-**React Native Directory PR:**
-[react-native-community/directory#2835](https://github.com/react-native-community/directory/pull/2835),
-opened from the owner's account (`gh` under `Coding/ME` uses
-`GH_CONFIG_DIR=~/.config/gh-personal`). CI is green after an `oxfmt` fix. It is waiting for
-a maintainer.
-
-**3.2.0 is prepared on local `master`** (fast-forwarded from `glass-options-3.2`):
-`glassVariant`, `glassTint`, `interactive`, `blurRadius`. It was tuned side by side on
-the iOS 26.5 simulator and the Android 17 emulator; see `docs/liquid-glass-variants.png`.
-The version is bumped and the CHANGELOG is final. The owner pushes `master` and the `v3.2.0`
-tag; CI publishes.
-
-Open for 3.2:
-- ~~**iOS `interactive`.**~~ Confirmed by the owner on the iOS 26 simulator after `f05b0a9`:
-  glass passed to `UIVisualEffectView`'s initialiser never wires up its touch interaction,
-  and has to be assigned once the view is in the hierarchy.
-- A GIF of `interactive` and the variants would show them off better than the still.
-- Optional: the A22 frame sweep. The owner calls it extra information, not a gate; the
-  margin-removal re-sweep and 3.2's press animation are both unmeasured. The phone is
-  borrowed: ask.
-
-Later: glass shapes that merge (iOS `UIGlassContainerEffect`); `blurMode="auto"`
-(proposed, undecided).
+Open:
+- **Android 11 and 12 fallbacks are code-read, not run.** The only API 30 image here is
+  x86_64 (it will not run on Apple Silicon), and there is no API 31/32 image. Running them
+  needs the arm64 system images (~1-1.5GB each): ask the owner first.
+- 6 Dependabot alerts for Ruby gems (`concurrent-ruby`, `activesupport`) from the example
+  app's `Gemfile`. These are React Native template pins, left as they are; the owner can
+  dismiss them as development-only.
+- Worktree `claude/laughing-keller-df6ca2` (the abandoned iOS 27 session) remains until
+  that session is archived.
+- Next features: glass shapes that merge (iOS `UIGlassContainerEffect`); `blurMode="auto"`
+  (proposed, undecided). Optional: the A22 frame sweep (the phone is borrowed; ask).
 
 ## Status
 

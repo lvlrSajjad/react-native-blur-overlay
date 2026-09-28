@@ -1,0 +1,86 @@
+# react-native-blur-overlay
+
+> Liquid Glass and live blur for React Native, on iOS and Android, from one component. `blurMode="glass"` is iOS 26's own `UIGlassEffect` on iOS and a matching refracting glass lens on Android 13+. `blurMode="live"` keeps a blur up to date as content scrolls behind it on Android 12+, as iOS always has. Works on the New Architecture (Fabric) and the legacy architecture, and in Expo development builds (not Expo Go). No third-party native dependencies.
+
+Install: `npm install react-native-blur-overlay` (then `cd ios && pod install`), or `npx expo install react-native-blur-overlay` in an Expo SDK 54+ development build. Autolinked; no config plugin. Requires React Native >= 0.80, iOS 15.1+, Android minSdk 24.
+
+## When to use it
+
+- A floating Liquid Glass tab bar, button or panel that looks the same on iOS and Android.
+- A frosted, blurred panel or overlay over scrolling content, kept live on Android.
+- A full-screen blurred overlay behind a card or menu, or behind a `<Modal>`.
+- Glass that responds to touch (`interactive`), is tinted (`glassTint`), or is clear rather than frosted (`glassVariant="clear"`).
+
+## Modes (`blurMode`)
+
+- `snapshot` (default): blurs the screen behind the overlay once. Android API 24+. On iOS every mode is a live `UIVisualEffectView`.
+- `live`: re-blurs a `<BlurTarget>` subtree as it draws. Android 12+ (API 31); falls back to `snapshot` below that. Inside a `<Modal>` it uses the system's window blur instead.
+- `glass`: Liquid Glass. iOS 26+: system `UIGlassEffect`. Android 13+ (API 33): live blur plus an AGSL lens that bends the backdrop toward the rim, with a directional hairline highlight. Falls back to `live` on Android 12, `snapshot` below, and the `blurStyle` blur below iOS 26.
+
+## Liquid Glass tab bar
+
+```tsx
+import BlurOverlay, { BlurTarget } from 'react-native-blur-overlay';
+
+<BlurTarget style={{ flex: 1 }}>
+  <FlatList /* your content */ />
+</BlurTarget>
+
+<BlurOverlay
+  visible
+  blurMode="glass"
+  glassVariant="regular"   // or "clear"
+  interactive              // responds to touch
+  style={{
+    position: 'absolute', left: 24, right: 24, bottom: 32, height: 64,
+    borderRadius: 32,      // half the height: a capsule
+  }}
+>
+  {/* tabs */}
+</BlurOverlay>
+```
+
+The overlay must not be inside the `<BlurTarget>` it blurs. Only a uniform `borderRadius` shapes a live or glass blur; per-corner radii leave it square.
+
+## Frosted live panel
+
+```tsx
+<BlurOverlay visible blurMode="live" blurRadius={16} saturation={1.8}
+  style={{ position: 'absolute', left: 20, right: 20, bottom: 40, height: 150, borderRadius: 28 }}>
+  {/* content */}
+</BlurOverlay>
+```
+
+## Props
+
+- `visible` (boolean): show or hide declaratively. Without it, use `openOverlay(id)` / `closeOverlay(id)` or the ref's `open()` / `close()`.
+- `blurMode`: `'snapshot' | 'live' | 'glass'`.
+- `glassVariant`: `'regular' | 'clear'` (both platforms; iOS `UIGlassEffectStyle`).
+- `glassTint` (color): glass body colour; alpha is strength (both platforms; iOS `tintColor`).
+- `interactive` (boolean): glass that responds to touch (both platforms).
+- `blurRadius` (dp): Android blur radius. iOS has no blur-amount control. `radius` (physical pixels) is deprecated.
+- `saturation` (default 1): Android only; around 1.5 to 1.8 matches iOS vividness.
+- `brightness` (-255..255), `downsampling`, `maxUpdateFps` (default 30), `captureOutset`, `blurTargetId`, `snapshotUpdateFps`: Android only.
+- `blurStyle` (iOS `UIBlurEffectStyle` names, e.g. `systemThinMaterial`), `vibrant`: iOS only.
+- `fadeDuration`, `onPress` (backdrop press), `closeOnChildPress`, `onShow`, `onHide`, `style`, `children`: both.
+
+`<BlurTarget id?>` marks the subtree a `live` or `glass` overlay captures on Android; it is a plain `View` on iOS.
+
+## Costs
+
+Measured on a Galaxy A22 (2021 low-end, Android 13): `live` costs about the same as `snapshot` (around 1.4-2.2% janky frames at 90Hz). `glass` adds no measurable GPU time and about 0.4ms of RenderThread time per frame; at 90Hz it drops more frames on that phone (2-14% depending on the run), and it never captures above half resolution.
+
+## Not supported
+
+- Expo Go (no third-party native code can load there).
+- Capturing `SurfaceView`-backed content on Android (video, camera, maps) in `snapshot`, `live` or `glass`.
+- A blur amount on iOS: Apple's materials and glass fix it; use `blurStyle` or `glassVariant`.
+
+## Links
+
+- README, full documentation: https://github.com/lvlrSajjad/react-native-blur-overlay#readme
+- Liquid Glass section: https://github.com/lvlrSajjad/react-native-blur-overlay#liquid-glass
+- Live blur on Android: https://github.com/lvlrSajjad/react-native-blur-overlay#live-blur-on-android
+- Changelog: https://github.com/lvlrSajjad/react-native-blur-overlay/blob/master/CHANGELOG.md
+- Example app: https://github.com/lvlrSajjad/react-native-blur-overlay/tree/master/example
+- npm: https://www.npmjs.com/package/react-native-blur-overlay
