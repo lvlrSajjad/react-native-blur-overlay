@@ -772,7 +772,9 @@ public class SajjadBlurOverlayView extends ReactViewGroup
         warnedUnsupported = true;
         Log.i(
             TAG,
-            "blurMode=\"live\" needs API "
+            "blurMode=\""
+                + blurMode
+                + "\" needs API "
                 + LIVE_SDK
                 + " or newer; this device is API "
                 + Build.VERSION.SDK_INT

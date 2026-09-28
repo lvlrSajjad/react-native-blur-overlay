@@ -27,7 +27,9 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
    * no clipping, React Native draws the border itself and leaves
    * `layer.cornerRadius` at 0.
    */
-  CGFloat _glassCornerRadius;
+  CGFloat _cornerRadius;
+  /** The effect view currently holds Liquid Glass, rather than a blur. */
+  BOOL _glassActive;
   /** `glassVariant`: YES for `"clear"`, NO for `"regular"`. */
   BOOL _glassClear;
   UIColor *_Nullable _glassTint;
@@ -71,37 +73,48 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   _vibrancyView.frame = self.bounds;
   _containerView.frame = self.bounds;
 
-  [self applyGlassShape];
+  [self applyShape];
 }
 
 /**
- * Glass draws its own shape, rim and highlight, so it has to be told the
- * overlay's corners rather than be clipped to them: a clip would cut the rim
- * off. A radius of half the short side or more is a capsule, which iOS 26 has
- * its own configuration for.
+ * Gives the effect view the overlay's corner radius — a capsule when it is at
+ * least half the short side.
+ *
+ * Glass draws its own shape, rim and highlight, so it is told the corners
+ * through iOS 26's corner configuration rather than clipped: a clip would cut
+ * the rim off. A blur has no rim, and is simply clipped. Before 3.2.1 only
+ * glass was shaped, so a rounded overlay on iOS drew a rounded border around a
+ * square blur, unless a parent clipped it.
  */
-- (void)applyGlassShape
+- (void)applyShape
 {
+  const CGSize size = self.bounds.size;
+  const CGFloat half = MIN(size.width, size.height) / 2;
+  const CGFloat radius = MAX(0, MIN(_cornerRadius, half));
+
 #if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   if (@available(iOS 26.0, *)) {
-    if (!_currentGlass) {
+    if (_glassActive) {
+      _blurView.layer.cornerRadius = 0;
+      _blurView.clipsToBounds = NO;
+
+      if (radius <= 0) {
+        _blurView.cornerConfiguration =
+            [UICornerConfiguration configurationWithUniformRadius:[UICornerRadius fixedRadius:0]];
+      } else if (radius >= half - 0.5) {
+        _blurView.cornerConfiguration = [UICornerConfiguration capsuleConfiguration];
+      } else {
+        _blurView.cornerConfiguration =
+            [UICornerConfiguration configurationWithUniformRadius:[UICornerRadius fixedRadius:radius]];
+      }
+
       return;
-    }
-
-    const CGSize size = self.bounds.size;
-    const CGFloat half = MIN(size.width, size.height) / 2;
-
-    if (_glassCornerRadius <= 0) {
-      _blurView.cornerConfiguration =
-          [UICornerConfiguration configurationWithUniformRadius:[UICornerRadius fixedRadius:0]];
-    } else if (_glassCornerRadius >= half - 0.5) {
-      _blurView.cornerConfiguration = [UICornerConfiguration capsuleConfiguration];
-    } else {
-      _blurView.cornerConfiguration = [UICornerConfiguration
-          configurationWithUniformRadius:[UICornerRadius fixedRadius:_glassCornerRadius]];
     }
   }
 #endif
+
+  _blurView.layer.cornerRadius = radius;
+  _blurView.clipsToBounds = radius > 0;
 }
 
 #pragma mark - Effect
@@ -128,6 +141,9 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   if (glassEffect != nil) {
     _blurView.effect = glassEffect;
   }
+
+  _glassActive = glassEffect != nil;
+  [self applyShape];
 
   if (glassEffect != nil) {
     // Glass reacts to touches, and treats content for legibility, only inside
@@ -279,16 +295,16 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   [super finalizeUpdates:updateMask];
 
   // Resolved the way React Native resolves it for its own border drawing, now
-  // that both the props and the layout are current. Only a uniform radius has
-  // a glass shape; per-corner radii leave it square.
+  // that both the props and the layout are current. Only a uniform radius
+  // shapes the blur; per-corner radii leave it square.
   const auto borderMetrics = _props->resolveBorderMetrics(_layoutMetrics);
   const auto &radii = borderMetrics.borderRadii;
   const bool uniform = radii.topLeft == radii.topRight && radii.topLeft == radii.bottomLeft &&
       radii.topLeft == radii.bottomRight;
   const CGFloat radius = uniform ? (CGFloat)radii.topLeft.horizontal : 0;
 
-  if (radius != _glassCornerRadius) {
-    _glassCornerRadius = radius;
+  if (radius != _cornerRadius) {
+    _cornerRadius = radius;
     [self setNeedsLayout];
   }
 }
@@ -310,7 +326,7 @@ static NSString *const SajjadBlurOverlayDefaultStyle = @"light";
   static const auto defaultProps = std::make_shared<const SajjadBlurOverlayProps>();
   _props = defaultProps;
 
-  _glassCornerRadius = 0;
+  _cornerRadius = 0;
   [self setGlassClear:NO tint:nil interactive:NO];
   [self setBlurStyle:SajjadBlurOverlayDefaultStyle vibrant:NO glass:NO];
 }
