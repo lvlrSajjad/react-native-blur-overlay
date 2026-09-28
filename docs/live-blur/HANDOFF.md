@@ -11,6 +11,11 @@ Metro 0.87.1 in the lockfile, `llms.txt` and discoverable package metadata). Lis
 React Native Directory (`react-native-community/directory#2835`, merged 2026-09-26).
 Expo is verified on SDK 57, and the example app runs on iOS 27.
 
+Discoverability (2026-09-29): npm description and keywords name Liquid Glass and live blur;
+`llms.txt` ships in the package; the GitHub description and 19 topics are updated; and the
+repo was submitted to Context7 (queued). Check
+`context7.com/lvlrsajjad/react-native-blur-overlay` resolves once it is processed.
+
 Open:
 - **Android 11 and 12 fallbacks are code-read, not run.** The only API 30 image here is
   x86_64 (it will not run on Apple Silicon), and there is no API 31/32 image. Running them
