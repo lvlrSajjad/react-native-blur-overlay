@@ -339,6 +339,15 @@ Two things to know:
   <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/liquid-glass-variants.png" width="700" alt="Regular, clear and blue-tinted glass, iOS 26 on the left and Android on the right">
 </p>
 
+`interactive`, pressed and slid along the bar:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/ios-interactive-glass.gif" width="400" alt="iOS 26: the capsule swells and brightens under a finger sliding along it">
+  <img src="https://raw.githubusercontent.com/lvlrSajjad/react-native-blur-overlay/master/docs/android-interactive-glass.gif" width="400" alt="Android: a soft light follows the finger along the capsule">
+</p>
+
+<sub>iOS 26 simulator (Apple's interactive glass, first) and the Android 16 emulator (second).</sub>
+
 Set `blurRadius` to override a variant's blur on Android.
 
 **On Android 13+ (API 33)** it is [live blur](#live-blur-on-android) with an AGSL lens chained after it:

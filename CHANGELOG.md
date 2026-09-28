@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased (3.2.1)
+
+### Fixed
+
+- **iOS: the blur follows the overlay's own `borderRadius`.** Only glass did
+  before: a rounded overlay drew a rounded border around a square blur,
+  unless a parent with `overflow: 'hidden'` clipped it. This included glass's
+  fallback below iOS 26. A capsule radius stays a capsule.
+- Android: below API 31 the fallback log line now names the mode that was
+  set (it said `"live"` even for `"glass"`).
+
+### Changed
+
+- The example app's Metro is 0.87.1, which drops `image-size` and the two
+  denial-of-service advisories against it. Development tooling only: nothing
+  in the published package changed.
+- The README shows `interactive` glass in motion on both platforms.
+
 ## 3.2.0
 
 Glass options that exist on both platforms: each maps to a `UIGlassEffect`
