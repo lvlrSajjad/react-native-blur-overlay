@@ -1,0 +1,13 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "React Native Blur Overlay",
+  "description": "Liquid Glass and live blur for React Native: iOS 26 UIGlassEffect and a matching Android glass, live backdrop blur, frosted panels and tab bars.",
+  "excludeFolders": ["docs/live-blur"],
+  "rules": [
+    "Use blurMode=\"glass\" for Liquid Glass. It is iOS 26's UIGlassEffect on iOS and a refracting glass lens on Android 13+, falling back to a live blur on Android 12, a snapshot below that, and the blurStyle blur below iOS 26.",
+    "On Android, blurMode=\"live\" and blurMode=\"glass\" need a <BlurTarget> around the content to blur, and the overlay must not be inside that BlurTarget.",
+    "Give a glass or live overlay a uniform borderRadius (half its height for a capsule tab bar). Per-corner radii leave a live or glass blur square.",
+    "Use blurRadius (dp) rather than the deprecated radius (physical pixels). Blur amount is Android-only: on iOS it is fixed by blurStyle or glassVariant.",
+    "It does not run in Expo Go. Use an Expo development build or prebuild (Expo SDK 54+)."
+  ]
+}
