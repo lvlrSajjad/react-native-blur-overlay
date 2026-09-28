@@ -5,6 +5,8 @@ import ReactAppDependencyProvider
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
+  // Set by SceneDelegate once the scene connects. Kept here because some
+  // React Native code still reaches for the app delegate's window.
   var window: UIWindow?
 
   var reactNativeDelegate: ReactNativeDelegate?
@@ -21,15 +23,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeDelegate = delegate
     reactNativeFactory = factory
 
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "BlurOverlayExample",
-      in: window,
-      launchOptions: launchOptions
-    )
-
+    // The window and React Native's root view are created in SceneDelegate.
     return true
+  }
+
+  func application(
+    _ application: UIApplication,
+    configurationForConnecting connectingSceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
   }
 }
 
